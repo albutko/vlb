@@ -13,6 +13,7 @@ import features.cv_kaze
 import features.superpoint
 import features.lf_net
 import features.transform_covariant
+import features.ddet
 from importlib import import_module
 
 
@@ -48,6 +49,12 @@ what_models_to_test = {
         'test':False},
     'transform_covariant':  {
         'class':'transform_covariant',
+        'test':False},
+    'ddet':  {
+        'class':'DDet',
+        'test':False},
+    'lift':  {
+        'class':'LIFT',
         'test':True}}
 
 
