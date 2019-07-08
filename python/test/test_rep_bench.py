@@ -37,9 +37,9 @@ if __name__ == "__main__":
 
     rep_result = list()
     for (modelName, model) in models_to_test:
-        vgg_result = rep_bench.evaluate(vggh, model, use_cache=False, save_result=True)
+        vgg_result = rep_bench.evaluate(vggh, model, use_cache=True, save_result=True)
         rep_result.append(vgg_result)
-        if getattr(model, 'close'):
+        if hasattr(model, 'close'):
             model.close()
 
     # Show the result
