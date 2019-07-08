@@ -21,16 +21,20 @@ import json
 
 dirname = os.path.dirname(__file__)
 
-model_path = dirname+'/tf-lift/release-aug'
-if MODEL_PATH not in sys.path:
-    sys.path.append(MODEL_PATH)
+model_path = os.path.join(dirname,'lift_misc/release-aug')
+if model_path not in sys.path:
+    sys.path.append(model_path)
 
-sys.path.append(dirname+'/tf-lift')
+sys.path.append(os.path.join(dirname,'lift_misc'))
 
-from tf-lift.utils import (IDX_ANGLE, XYZS2kpList, draw_XYZS_to_img, get_patch_size,
-                   get_ratio_scale, get_XYZS_from_res_list, restore_network, update_affine)
+from features.lift_misc.utils import (IDX_ANGLE, XYZS2kpList, draw_XYZS_to_img, get_patch_size,get_patch_size_no_aug,
+                   get_ratio_scale, get_XYZS_from_res_list, restore_network, update_affine,
+                   loadh5, get_tensor_shape, image_summary_nhwc, make_theta )
 
-
+from features.lift_misc.lift import Network
+from features.lift_misc.config import get_config
+from features.lift_misc.modules.spatial_transformer import transformer as transformer
+from features.lift_misc.losses import loss_overlap
 class LIFT(DetectorAndDescriptor):
     def __init__(self):
         super(
@@ -43,16 +47,17 @@ class LIFT(DetectorAndDescriptor):
                 patch_input=True)
 
         self.network = {}
-        self.config = {}
-        self._set_configs()
+        self.config, _ = get_config('')
+        self.dataset = {}
+        # self._set_configs()
         self._build_network('kp')
         self._build_network('desc')
 
-    def _set_configs(self)
+    def _set_configs(self):
         for task in ['kp','desc']:
-            self.config[task] =  json.load(open(model_path+'/%s/params.json'%(task),'r')
+            self.config[task] =  json.load(open(model_path+'/%s/params.json'%(task),'r'))
 
-    def _build_network(self, task)
+    def _build_network(self, task):
         tfconfig = tf.ConfigProto()
         tfconfig.gpu_options.allow_growth = True
         self.sess = tf.Session(config=tfconfig)
@@ -81,7 +86,32 @@ class LIFT(DetectorAndDescriptor):
         # We have everything ready. We finalize and initialie the network here.
         self.sess.run(tf.global_variables_initializer())
 
+    def run(self):
 
+        subtask = self.config.subtask
+
+        # Load the network weights for the module of interest
+        print("-------------------------------------------------")
+        print(" Loading Trained Network ")
+        print("-------------------------------------------------")
+        # Try loading the joint version, and then fall back to the current task
+        # silently if failed.
+        try:
+            restore_res = restore_network(self, "joint")
+        except:
+            pass
+        if not restore_res:
+            restore_res = restore_network(self, subtask)
+        if not restore_res:
+            raise RuntimeError("Could not load network weights!")
+
+        # Run the appropriate compute function
+        print("-------------------------------------------------")
+        print(" Testing ")
+        print("-------------------------------------------------")
+
+        eval("self._compute_{}()".format(subtask))
+        
     def detect_feature(self, image):
         img = fu.all_to_gray(image)
         kpts, _ = self.run(img)
@@ -265,3 +295,8 @@ class LIFT(DetectorAndDescriptor):
         # save_dict['keypoints'] = cur_data["kps"]
         save_dict['keypoints'] = kps
         save_dict['descriptors'] = descs
+
+
+
+#
+# lift.py ends here
