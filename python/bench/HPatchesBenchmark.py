@@ -23,7 +23,7 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 import os
 from tqdm import tqdm
-import pickle as pkl
+import scipy
 import subprocess
 
 import bench.BenchmarkTemplate
@@ -56,7 +56,7 @@ class HPatchesBenchmark(Benchmark):
         self.tmp_desc_dir = tmp_desc_dir
 
     def extract_descriptor_from_patch(self, dataset, detector,
-                           use_cache=True):
+                           use_cache):
         """
         Extract feature from HPatches patches.
 
@@ -93,19 +93,23 @@ class HPatchesBenchmark(Benchmark):
                 desc_dir = '{}{}'.format(self.tmp_desc_dir, dataset.name)
                 descriptor_file_name = '{}{}/{}/{}/{}.csv'.format(self.tmp_desc_dir,
                                                                          dataset.name, detector.name, sequence.name, image.idx)
+
+                extract = True
+
                 if use_cache:
-                    try:
-                        descriptor = np.load(descriptor_file_name + '.csv')
-                        get_feature_flag = True
-                    except BaseException:
-                        descriptors = extract_descriptors_from_hpatches_image(detector, image.image_data)
-                        np.savetxt(descriptor_file_name, descriptors, delimiter=',', fmt='%10.5f')
+                    extract = False
+                    if not os.path.exists(descriptor_file_name):
+                        extract = True
+                if extract:
+                    img = scipy.ndimage.imread(image.image_path)
+                    descriptors = extract_descriptors_from_hpatches_image(detector, img)
+                    np.savetxt(descriptor_file_name, descriptors, delimiter=',', fmt='%10.5f')
 
         return desc_dir
 
 
     # Evaluation warpper
-    def evaluate_warpper(self, dataset, detector, dist, use_cache=True):
+    def evaluate_warpper(self, dataset, detector, dist, use_cache):
         """
         Load descriptor from cached file. If failed, extract descriptor from image.
 
@@ -178,8 +182,11 @@ def extract_descriptors_from_hpatches_image(detector, hpatch_patch_image):
     for i, patch in enumerate(patch_list):
         patches[i, :, :] = patch
 
-    for i in range(num_patches):
-        descriptors.append(detector.extract_descriptor_from_patch(patches[i,:,:]))
+    if detector.can_batch:
+        descriptors = detector.extract_descriptors_from_patch_batch(patches)
+    else:
+        for i in range(num_patches):
+            descriptors.append(detector.extract_descriptor_from_patch(patches[i,:,:]))
+        descriptors = np.array(descriptors).reshape((num_patches, -1))
 
-    descriptors = np.array(descriptors).reshape((num_patches, -1))
     return descriptors
