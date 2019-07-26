@@ -50,7 +50,6 @@ class transform_covariant(DetectorAndDescriptor):
             exit()
 
     def detect_feature(self, image):
-        print("extracting")
         image = features.feature_utils.all_to_BGR(image)
 
         #build image pyramid
