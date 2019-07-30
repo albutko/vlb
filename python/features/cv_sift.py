@@ -20,19 +20,19 @@ class cv_sift(DetectorAndDescriptor):
 
 
     def detect_feature(self, image):
-        surf = cv2.xfeatures2d.SIFT_create()
-        features =  surf.detect(image, None)
+        sift = cv2.xfeatures2d.SIFT_create()
+        features =  sift.detect(image, None)
         pts = np.array([features[idx].pt for idx in range(len(features))])
         return pts
 
     def extract_descriptor(self, image, feature):
-        surf = cv2.xfeatures2d.SIFT_create()
-        descriptors =  surf.compute(image, feature)
+        sift = cv2.xfeatures2d.SIFT_create()
+        descriptors =  sift.compute(image, feature)
         return descriptors
 
     def extract_all(self, image):
-        surf = cv2.xfeatures2d.SIFT_create()
-        features, descriptors =  surf.detectAndCompute(image, None)
+        sift = cv2.xfeatures2d.SIFT_create()
+        features, descriptors =  sift.detectAndCompute(image, None)
         pts = np.array([features[idx].pt for idx in range(len(features))])
         return (pts, descriptors)
 
