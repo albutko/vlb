@@ -2,7 +2,7 @@
 OpenCV SIFT Implementation
 Author: Alex Butenko
 """
-from .DetectorDescriptorTemplate import DetectorAndDescriptor
+from DetectorDescriptorTemplate import DetectorAndDescriptor
 
 import cv2
 import numpy as np
@@ -24,6 +24,11 @@ class cv_sift(DetectorAndDescriptor):
         features =  sift.detect(image, None)
         pts = np.array([features[idx].pt for idx in range(len(features))])
         return pts
+
+    def detect_feature_cv_kpt(self, image):
+        sift = cv2.xfeatures2d.SIFT_create()
+        features =  sift.detect(image, None)
+        return features
 
     def extract_descriptor(self, image, feature):
         sift = cv2.xfeatures2d.SIFT_create()
