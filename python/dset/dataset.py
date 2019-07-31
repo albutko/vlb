@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#-*- coding: utf-8 -*- 
+#-*- coding: utf-8 -*-
 #===========================================================
 #  File Name: dataset.py
 #  Author: Xu Zhang, Columbia University
@@ -10,7 +10,7 @@
 #
 #  Copyright (C) 2018 Xu Zhang
 #  All rights reserved.
-# 
+#
 #  This file is made available under
 #  the terms of the BSD license (see the COPYING file).
 #===========================================================
@@ -50,7 +50,7 @@ class Image:
 
 class Link:
     """Link data structure. Describe an image pair, it's useful for matching dataset.
-    
+
     Attributes
     ----------
 
@@ -63,7 +63,7 @@ class Link:
     transform_matrix:  array
         Transform Matrix of the image pair
     task:  dict
-        Task information 
+        Task information
     """
 
     source = ''
@@ -98,11 +98,11 @@ class Sequence:
     image_dict = None # list cannot be initialized here!
     link_id_list = None
     link_dict = None
-    
+
     def images(self):
         """
         Return images in the sequence.
-        
+
         :returns: images
         :rtype: list
         """
@@ -112,7 +112,7 @@ class Sequence:
     def links(self):
         """
         Return links in the sequence.
-        
+
         :returns: links
         :rtype: list
         """
@@ -121,7 +121,7 @@ class Sequence:
 
 class SequenceDataset():
     """Sequence dataset for image matching test
-    
+
     Attributes
     ----------
 
@@ -130,16 +130,16 @@ class SequenceDataset():
     root_dir: str
         Directory for the data
     download_flag: boolean
-        Download data or not. Keep it False, unless you need to update the dataset. 
+        Download data or not. Keep it False, unless you need to update the dataset.
                     Data will automatically download, if there is no data in the root_dir.
     """
 
-    __metaclass__ = ABCMeta 
-    def __init__(self, name, root_dir = './datasets/', download_flag = False):
+    __metaclass__ = ABCMeta
+    def __init__(self, name, root_dir = './datasets/', download_flag = False, set_task=True, dataset_info_name=None):
         self.name = name
         self.root_dir = root_dir
-        self.load_dataset_info()
-        
+        self.load_dataset_info(dataset_info_name)
+
         if download_flag:
             self.download()
 
@@ -150,25 +150,28 @@ class SequenceDataset():
 
         self.read_image_data()
         self.read_link_data()
-        self.set_task()
+        if set_task:
+            self.set_task()
 
-    def load_dataset_info(self):
+    def load_dataset_info(self, dataset_info_name=None):
         """
         Load data from hard disk
         """
+        if dataset_info_name is None:
+            dataset_info_name = self.name
 
         try:
-            with open('{}/dataset_info/{}.json'.format(self.root_dir, self.name)) as info_file:    
+            with open('{}/dataset_info/{}.json'.format(self.root_dir, dataset_info_name)) as info_file:
                 json_info = json.load(info_file)
         except:
-            print('Cannot load database information file: {}dataset_info/{}.json'.format(self.root_dir, self.name))
+            print('Cannot load database information file: {}dataset_info/{}.json'.format(self.root_dir, dataset_info_name))
             return
 
         self.url = json_info['url']
         self.sequence_name_list = json_info['Sequence Name List']
         self.sequence_num = len(self.sequence_name_list)
         self.sequences = {}
-        
+
         for read_sequence in json_info['Sequences']:
             this_sequence = Sequence()
             try:
@@ -177,13 +180,13 @@ class SequenceDataset():
                 this_sequence.label = read_sequence['Label']
             except:
                 pass
-            
+
             this_sequence.image_dict = {}
             this_sequence.image_id_list = []
 
             for read_image in read_sequence['Images']:
                 this_image = Image()
-                this_image.idx = read_image['id'] 
+                this_image.idx = read_image['id']
                 this_image.label = read_image['label']
                 this_image.filename = read_image['file']
 
@@ -201,7 +204,7 @@ class SequenceDataset():
                 this_link.transform_matrix = None
 
                 this_link.task = {}
-                
+
                 try:
                     this_link.filename = read_link['file']
                 except:
@@ -218,10 +221,10 @@ class SequenceDataset():
                     except:
                         this_link.transform_matrix = np.eye(3,dtype = np.float)
 
-                
+
                 this_sequence.link_dict["{}_{}".format(read_link['source'],read_link['target'])] = this_link
                 this_sequence.link_id_list.append("{}_{}".format(read_link['source'],read_link['target']))
-                
+
             self.sequences[this_sequence.name] = this_sequence
 
     def read_image_data_vggh(self):
@@ -229,7 +232,7 @@ class SequenceDataset():
         Load image data from vggh like dataset
         """
 
-        for sequence_name in self.sequence_name_list:
+        for i, sequence_name in enumerate(self.sequence_name_list):
             sequence = self.sequences[sequence_name]
             for image_id in sequence.image_id_list:
                 img = scipy.ndimage.imread('{}{}/{}'.format(self.root_dir, self.name, sequence.image_dict[image_id].filename))
@@ -248,13 +251,13 @@ class SequenceDataset():
                             or file_extension == 'jpeg' or file_extension == 'JPEG':
                         ftest = open('{}/{}/{}'.format(self.root_dir, self.name, sequence.image_dict[image_id].filename), 'rb')
                         tags = exifread.process_file(ftest)
-                        
+
                         try:
                             if str(tags['Thumbnail Orientation']) == 'Rotated 90 CW':
-                                img = cv2.transpose(img)  
+                                img = cv2.transpose(img)
                                 img = cv2.flip(img, 1)
                             elif str(tags['Thumbnail Orientation']) == 'Rotated 90 CCW':
-                                img = cv2.transpose(img)  
+                                img = cv2.transpose(img)
                                 img = cv2.flip(img, 0)
                             elif str(tags['Thumbnail Orientation']) == 'Rotated 180':
                                 img = cv2.flip(img, -1)
@@ -284,7 +287,12 @@ class SequenceDataset():
                                 if len(line)<2:
                                     continue
                                 array_line = []
-                                for element in line.split(' '):
+
+                                delimiter = ' '
+                                if ',' in line:
+                                    delimiter = ','
+
+                                for element in line.split(delimiter):
                                     if element == '' or element =='\n':
                                         continue
                                     number = float(element)
@@ -309,7 +317,7 @@ class SequenceDataset():
                 image_b = sequence.image_dict[this_link.target]
                 this_link.task['ima'] = str(image_a.idx)
                 this_link.task['imb'] = str(image_b.idx)
-                
+
                 try:
                     imga_ch = image_a.image_data.shape[2]
                 except:
@@ -336,7 +344,7 @@ class SequenceDataset():
     def get_sequence(self, sequence_name):
         """
         Get a sequence by name.
-        
+
         :param sequence_name: Name of the sequence
         :type sequence_name: str
         :returns: sequence
@@ -348,7 +356,7 @@ class SequenceDataset():
     def get_image(self,sequence_name, image_id):
         """
         Get a image by sequence name and image ID.
-        
+
         :param sequence_name: Name of the sequence
         :type sequence_name: str
         :param image_id: Image ID
@@ -362,7 +370,7 @@ class SequenceDataset():
     def get_link(self, sequence_name, link_id):
         """
         Get a link by sequence name and link ID.
-        
+
         :param sequence_name: Name of the sequence
         :type sequence_name: str
         :param link_id: Link ID
@@ -372,11 +380,11 @@ class SequenceDataset():
         """
 
         return self.sequences[sequence_name].link_dict[link_id].transform_matrix
-    
+
     def get_task(self, sequence_name, link_id):
         """
         Get a task by sequence name and link ID.
-        
+
         :param sequence_name: Name of the sequence
         :type sequence_name: str
         :param link_id: Link ID
@@ -390,7 +398,7 @@ class SequenceDataset():
     def __getitem__(self,idx):
         """
         Get a sequence by index.
-        
+
         :param idx: Index of the sequence
         :type idx: int
         :returns: sequence
@@ -398,7 +406,7 @@ class SequenceDataset():
         """
 
         return self.sequences[self.sequence_name_list[idx]]
-    
+
     @abstractmethod
     def download(self):
         """
