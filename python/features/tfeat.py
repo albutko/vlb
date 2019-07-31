@@ -11,8 +11,8 @@ import torch.nn.functional as F
 import numpy as np
 import cv2
 
-from DetectorDescriptorTemplate import DetectorAndDescriptor
-import feature_utils as utils
+from features.DetectorDescriptorTemplate import DetectorAndDescriptor
+import features.feature_utils as utils
 
 
 dirname = os.path.dirname(__file__)
@@ -35,14 +35,13 @@ class tfeat(DetectorAndDescriptor):
 
     def extract_descriptors_from_patch_batch(self, batch):
         nb_patches = batch.shape[0]
-
         batch_resized = list()
         for i, patch in enumerate(batch):
             batch_resized.append(cv2.resize(batch[i], (32, 32), interpolation=cv2.INTER_AREA))
 
         batch_resized = torch.tensor(batch_resized)
 
-        batch_resized = batch_resized.view(-1,1,32,32)
+        batch_resized = batch_resized.view(nb_patches,1,32,32)
         desc = self.model(batch_resized.float())
         return desc.detach().numpy()
 
@@ -59,7 +58,7 @@ class tfeat(DetectorAndDescriptor):
         gray_image = utils.all_to_gray(image)
         patches = []
         for f in feature:
-            patch = utils.extract_patch_cv(image, f, patch_sz=32)
+            patch = utils.extract_patch(gray_image, f, patch_sz=32)
             patches.append(patch)
 
         patches = np.array(patches)
