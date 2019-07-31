@@ -10,7 +10,9 @@ import cv2
 import numpy as np
 
 from scipy.io import loadmat
+import os
 
+dirname = os.path.dirname(os.path.realpath(__file__))
 class sift_pca(DetectorAndDescriptor):
     def __init__(self, eigenmat='./sift_pca_misc/sift-pca.mat'):
         super(
@@ -21,7 +23,7 @@ class sift_pca(DetectorAndDescriptor):
                 is_descriptor=True,
                 is_both=True)
 
-        self.eigvecs = loadmat(eigenmat).get('pca_sift_eigvecs')
+        self.eigvecs = loadmat(os.path.join(dirname,eigenmat)).get('pca_sift_eigvecs')
 
     def detect_feature(self, image):
         sift = cv2.xfeatures2d.SIFT_create()
