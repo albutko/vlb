@@ -3,19 +3,21 @@ OpenCV KAZE Implementation
 Author: Alex Butenko
 """
 
-from features.DetectorDescriptorTemplate import DetectorAndDescriptor
+from DetectorDescriptorTemplate import DetectorAndDescriptor
 import sys
 import os
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
+import numpy as np
+import feature_utils as utils
 
 dirname = os.path.dirname(__file__)
 
 class spreadout_plus_hardnet(DetectorAndDescriptor):
     def __init__(self):
         super(
-            hardnet,
+            spreadout_plus_hardnet,
             self).__init__(
                 name='spreadout_plus_hardnet',
                 is_detector=False,
@@ -26,14 +28,32 @@ class spreadout_plus_hardnet(DetectorAndDescriptor):
         cudnn.benchmark = True
         self.model = HardNetModel()
         self.device = ('cuda' if torch.cuda.is_available() else 'cpu')
-        ckpt = torch.load(dirname+'/hardnet/checkpoint_liberty_with_aug.pth',
+        ckpt = torch.load(os.path.join(dirname,'spreadout_plus_hardnet_misc/checkpoint_9_with_gor.pth'),
                           map_location=self.device)
 
         self.model.load_state_dict(ckpt['state_dict'])
+        self.model.eval()
 
-    def extract_descriptor_from_patch(self, patches):
-        descriptors = self.model(patches)
+    def extract_descriptors_from_patch_batch(self, batch):
+
+        for i, p in enumerate(batch):
+            batch[i] = utils.all_to_gray(p)
+
+        batch = np.expand_dims(batch, axis=1)
+        patch = torch.from_numpy(batch)
+        descriptors = self.model(patch.float())
         return descriptors
+
+    def extract_descriptor(self, image, feature):
+        gray_image = utils.all_to_gray(image)
+        patches = []
+        for f in feature:
+            patch = utils.extract_patch_cv(image, f, patch_sz=32)
+            patches.append(patch)
+
+        patches = np.array(patches)
+        desc = self.extract_descriptors_from_patch_batch(patches)
+        return desc
 
 
 class HardNetModel(nn.Module):
@@ -71,7 +91,8 @@ class HardNetModel(nn.Module):
         return (x - mp.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).expand_as(x)) / sp.unsqueeze(-1).unsqueeze(-1).unsqueeze(1).expand_as(x)
 
     def forward(self, input):
-        x_features = self.features(self.input_norm(input))
+        norm_x = self.input_norm(input)
+        x_features = self.features(norm_x)
         x = x_features.view(x_features.size(0), -1)
         return L2Norm()(x)
 

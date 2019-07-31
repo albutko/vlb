@@ -3,7 +3,7 @@ import subprocess
 
 import cv2
 import numpy as np
-import features.feature_utils
+import features.feature_utils as utils
 from features.DetectorDescriptorTemplate import DetectorAndDescriptor
 
 dirname = os.path.dirname(__file__)
@@ -38,4 +38,15 @@ class DeepDesc(DetectorAndDescriptor):
                         shell=False)
 
         desc = np.loadtxt(open(self.temp_desc_path,'r'), dtype='float64', delimiter=',')
+        return desc
+
+    def extract_descriptor(self, image, feature):
+        gray_image = utils.all_to_gray(image)
+        patches = []
+        for f in feature:
+            patch = utils.extract_patch_cv(image, f, patch_sz=32)
+            patches.append(patch)
+
+        patches = np.array(patches)
+        desc = self.extract_descriptors_from_patch_batch(patches)
         return desc

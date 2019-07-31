@@ -2,17 +2,22 @@
 TFeat Implementation
 Author: Alex Butenko
 """
+import sys
+import os
+
 import torch
 from torch import nn
 import torch.nn.functional as F
-
+import numpy as np
 import cv2
-from features.DetectorDescriptorTemplate import DetectorAndDescriptor
-import sys
+
+from DetectorDescriptorTemplate import DetectorAndDescriptor
+import feature_utils as utils
 
 
+dirname = os.path.dirname(__file__)
 class tfeat(DetectorAndDescriptor):
-    def __init__(self, pretrained_model='./python/features/tfeat_misc/tfeat-liberty.params'):
+    def __init__(self, pretrained_model='tfeat_misc/tfeat-liberty.params'):
         super(
             tfeat,
             self).__init__(
@@ -24,6 +29,7 @@ class tfeat(DetectorAndDescriptor):
             can_batch=True)
 
         self.model = TNet()
+        pretrained_model = os.path.join(dirname, pretrained_model)
         self.model.load_state_dict(torch.load(pretrained_model, map_location='cpu'))
         self.model.eval()
 
@@ -48,6 +54,20 @@ class tfeat(DetectorAndDescriptor):
         patch = patch.view(1,1,32,32)
         desc = self.model(patch.float())
         return desc.detach().numpy()
+
+    def extract_descriptor(self, image, feature):
+        gray_image = utils.all_to_gray(image)
+        patches = []
+        for f in feature:
+            patch = utils.extract_patch_cv(image, f, patch_sz=32)
+            patches.append(patch)
+
+        patches = np.array(patches)
+        desc = self.extract_descriptors_from_patch_batch(patches)
+
+        return desc
+
+
 class TNet(nn.Module):
     """TFeat model definition
     """
