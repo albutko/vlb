@@ -74,7 +74,7 @@ def all_to_BGR(image):
     if image.ndim == 2:
         image = np.expand_dims(image, 2)
         image = np.repeat(image, 3, axis=2)
-        
+
     if image.shape[2] == 1:
         image = np.repeat(image, 3, axis=2)
     if image.shape[2] == 4:
@@ -120,11 +120,11 @@ def extract_patch(img, kp, patch_sz=32, rectify_flag=False):
     :returns: patch
     :rtype: array(w*h)
     """
-
+    img = np.float32(img)
     sub = cv2.getRectSubPix(img, (int(kp[2] / 2 * patch_sz),
                                   int(kp[2] / 2 * patch_sz)), (kp[1], kp[0]))
     res = cv2.resize(sub, (patch_sz, patch_sz))
-    if rectigy_flag:
+    if rectify_flag:
         res = rectify_patch(res, kp, patch_sz)
     return np.asarray(res)
 
