@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#-*- coding: utf-8 -*- 
+#-*- coding: utf-8 -*-
 #===========================================================
 #  File Name: DetectorDescriptorTemplate.py
 #  Author: Xu Zhang, Columbia University
@@ -10,7 +10,7 @@
 #
 #  Copyright (C) 2018 Xu Zhang
 #  All rights reserved.
-# 
+#
 #  This file is made available under
 #  the terms of the BSD license (see the COPYING file).
 #===========================================================
@@ -30,7 +30,7 @@ from abc import ABCMeta, abstractmethod
 class DetectorAndDescriptor():
     """Basic template class for detector and descriptor.
 
-    Attributes 
+    Attributes
     ----------
 
     name: str
@@ -50,7 +50,7 @@ class DetectorAndDescriptor():
     __metaclass__ = ABCMeta
 
     def __init__(self, name, is_detector=False, is_descriptor=False,
-                 is_both=True, csv_flag=False, patch_input=False):
+                 is_both=True, csv_flag=False, patch_input=False, can_batch=False):
         self.name = name
         self.is_detector = is_detector
         self.is_descriptor = is_descriptor
@@ -62,11 +62,11 @@ class DetectorAndDescriptor():
     def detect_feature(self, image):
         """
         Extract feature from image.
-        
+
         :param image: The image
         :type image: array
         :returns: feature
-        :rtype: array(n*d)        
+        :rtype: array(n*d)
         """
         pass
 
@@ -88,21 +88,21 @@ class DetectorAndDescriptor():
     def extract_all(self, image):
         """
         Extract feature and descriptor from image.
-        
+
         :param image: The image
         :type image: array
         :returns: feature, descriptor
-        :rtype: array(n*d)     
+        :rtype: array(n*d)
         """
         pass
 
 
 class DetectorDescriptorBundle(DetectorAndDescriptor):
     """
-    Combine a detector and a descriptor to make a new detector+descriptor. 
+    Combine a detector and a descriptor to make a new detector+descriptor.
     For paper only focuses on either detector or descriptor.
-    
-    Attributes 
+
+    Attributes
     ----------
 
     name: str
@@ -127,7 +127,7 @@ class DetectorDescriptorBundle(DetectorAndDescriptor):
     def detect_feature(self, image):
         """
         Extract feature from image.
-        
+
         :param image: The image
         :type image: array
         :returns: feature
@@ -162,11 +162,11 @@ class DetectorDescriptorBundle(DetectorAndDescriptor):
     def extract_all(self, image):
         """
         Extract feature and descriptor from image.
-        
+
         :param image: The image
         :type image: array
         :returns: feature, descriptor
-        :rtype: array(n*d)     
+        :rtype: array(n*d)
         """
 
         feature = []
