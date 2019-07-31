@@ -2,11 +2,12 @@
 OpenCV SIFT Implementation
 Author: Alex Butenko
 """
-from DetectorDescriptorTemplate import DetectorAndDescriptor
+from features.DetectorDescriptorTemplate import DetectorAndDescriptor
 
 import cv2
 import numpy as np
 
+MAX_CV_KPTS = 2500
 class cv_sift(DetectorAndDescriptor):
     def __init__(self):
         super(
@@ -28,6 +29,16 @@ class cv_sift(DetectorAndDescriptor):
     def detect_feature_cv_kpt(self, image):
         sift = cv2.xfeatures2d.SIFT_create()
         features =  sift.detect(image, None)
+        features_cv = np.array([[f.pt[1], f.pt[0], f.size, f.angle] for f in features])
+        responses = np.array([f.response for f in features])
+
+        nb_kpts = MAX_CV_KPTS
+        if features_cv.shape[0] < MAX_CV_KPTS:
+            nb_kpts = features_cv.shape[0]
+
+        order = responses.argsort()[::-1][:nb_kpts]
+        features = features_cv[order,:]
+
         return features
 
     def extract_descriptor(self, image, feature):
