@@ -20,16 +20,18 @@ class cv_convopt(DetectorAndDescriptor):
                 patch_input=False)
 
     def extract_descriptor(self, image, features):
-        """ keypoints must be OpenCV keypoints """
         keypoints = list()
         for feature in features:
             kpt = cv2.KeyPoint()
             kpt.pt = (feature[0], feature[1])
+            kpt.size = feature[2]
+            kpt.angle = feature[3]
             keypoints.append(kpt)
 
-        vgg = cv2.xfeature.VGG()
+        vgg = cv2.xfeatures2d.VGG_create()
 
-        descriptors = vgg.compute(image, keypoints)
+        _, descriptors = vgg.compute(image, keypoints)
+
         return descriptors
 
     def extract_descriptor_from_patch(self, patches):
