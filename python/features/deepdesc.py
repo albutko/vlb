@@ -44,7 +44,7 @@ class DeepDesc(DetectorAndDescriptor):
         gray_image = utils.all_to_gray(image)
         patches = []
         for f in feature:
-            patch = utils.extract_patch_cv(image, f, patch_sz=32)
+            patch = utils.extract_patch(gray_image, f, patch_sz=64)
             patches.append(patch)
 
         patches = np.array(patches)
