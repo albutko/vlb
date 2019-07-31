@@ -24,6 +24,7 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 import os
 from tqdm import tqdm
+import scipy
 import pickle as pkl
 
 class Benchmark():
@@ -96,6 +97,9 @@ class Benchmark():
                         feature = self.load_csv_feature(feature_csv_name)
                         # pdb.set_trace()
                     else:
+                        img = np.array()
+                        if hasattr(image, 'image_path'):
+                            image.image_data = scipy.ndimage.imread(image.image_path)
                         feature = detector.detect_feature(image.image_data)
                     # print(feature.shape)
                     if save_feature:
@@ -159,6 +163,8 @@ class Benchmark():
                                                                                        detector.name, sequence.name, image.idx)
                         descriptor = self.load_csv_feature(descriptor_csv_name)
                     else:
+                        if hasattr(image, 'image_path'):
+                            image.image_data = scipy.ndimage.imread(image.image_path)
                         if detector.is_both:
                             feature, descriptor = detector.extract_all(
                                 image.image_data)
@@ -241,6 +247,8 @@ class Benchmark():
         try:
             descriptor = np.load(descriptor_file_name)
         except BaseException:
+            if hasattr(image, 'image_path'):
+                image.image_data = scipy.ndimage.imread(image.image_path)
             feature = detector.detect_feature(image.image_data)
             descriptor = detector.extract_descriptor(
                 image.image_data, feature=feature)
