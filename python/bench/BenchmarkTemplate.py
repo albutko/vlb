@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#-*- coding: utf-8 -*- 
+#-*- coding: utf-8 -*-
 #===========================================================
 #  File Name: BenchmarkTemplate.py
 #  Author: Xu Zhang, Columbia University
@@ -10,13 +10,13 @@
 #
 #  Copyright (C) 2018 Xu Zhang
 #  All rights reserved.
-# 
+#
 #  This file is made available under
 #  the terms of the BSD license (see the COPYING file).
 #===========================================================
 
 """
-This module describe benchmark template. 
+This module describe benchmark template.
 A benchmark is given a detector/descriptor and a dataset, the way of performing the evluation.
 """
 
@@ -28,9 +28,9 @@ import pickle as pkl
 
 class Benchmark():
     __metaclass__ = ABCMeta
-    
+
     """Benchmark Template
-    
+
     Attributes
     ----------
 
@@ -52,7 +52,7 @@ class Benchmark():
                        use_cache=True, save_feature=True):
         """
         Extract feature from image.
-        
+
         :param dataset: Dataset to extract the feature
         :type dataset: SequenceDataset
         :param detector: Detector used to extract the feature
@@ -61,7 +61,7 @@ class Benchmark():
         :type use_cache: boolean
         :param save_feature: Save computated feature or not
         :type save_feature: boolean
-        :returns: feature 
+        :returns: feature
         :rtype: dict
         """
 
@@ -109,7 +109,7 @@ class Benchmark():
                            use_cache=False, save_feature=True):
         """
         Extract feature from image.
-        
+
         :param dataset: Dataset to extract the descriptor
         :type dataset: SequenceDataset
         :param detector: Detector used to extract the descriptor
@@ -118,7 +118,7 @@ class Benchmark():
         :type use_cache: boolean
         :param save_feature: Save computated feature or not
         :type save_feature: boolean
-        :returns: feature, descriptor 
+        :returns: feature, descriptor
         :rtype: dict, dict
         """
         feature_dict = {}
@@ -180,7 +180,7 @@ class Benchmark():
     def load_csv_feature(self, csv_feature_file):
         """
         Load feature from csvfile.
-        
+
         :param csv_feature_file: csv file to load feature
         :type csv_feature_file: str
         :returns: feature
@@ -197,7 +197,7 @@ class Benchmark():
     def load_feature(self, dataset_name, sequence_name, image, detector):
         """
         Load feature from cached file. If failed, extract feature from image
-        
+
         :param dataset_name: Name of the dataset
         :type dataset_name: str
         :param sequence_name: Name of the sequence
@@ -223,7 +223,7 @@ class Benchmark():
     def load_descriptor(self, dataset_name, sequence_name, image, detector):
         """
         Load descriptor from cached file. If failed, extract descriptor from image
-        
+
         :param dataset_name: Name of the dataset
         :type dataset_name: str
         :param sequence_name: Name of the sequence
@@ -280,7 +280,7 @@ class Benchmark():
         sequence_result['result_link_id_list']: ID of each link in sequence_result (Same order)
 
 
-        
+
         :param dataset: Dataset to extract the feature
         :type dataset: SequenceDataset
         :param detector: Detector used to extract the feature
@@ -295,7 +295,7 @@ class Benchmark():
         :type save_result: boolean
         :param custom_extraction: Use custom extraction method or not. See also  and extract_descriptor_custom
         :type custom_extraction: boolean
-        :returns: result 
+        :returns: result
         :rtype: dict
 
         See Also
@@ -444,7 +444,7 @@ class Benchmark():
     def evaluate(self, dataset, detector):
         """
         Main function to run the evaluation wrapper. It could be different for different evaluation
-        
+
         :param dataset: Dataset to extract the feature
         :type dataset: SequenceDataset
         :param detector: Detector used to extract the feature
@@ -461,14 +461,14 @@ class Benchmark():
     def evaluate_unit(self, feature_1, feature_2, task):
         """
         Single evaluation unit. Given two features, return the result. Different for different benchmark
-        
+
         :param feature_1: Feature to run. It can be feature or descriptor.
-        :type feature_1: array 
+        :type feature_1: array
         :param feature_2: Feature to run. It can be feature or descriptor.
         :type feature_2: array
         :param task: What to run
         :type task: dict
-        
+
         See Also
         --------
 
@@ -482,8 +482,8 @@ class Benchmark():
     def detect_feature_custom(self, dataset, detector,
                               use_cache=False, save_feature=True):
         """
-        Customized feature extraction method. For special task. 
-        
+        Customized feature extraction method. For special task.
+
         :param dataset: Dataset to extract the feature
         :type dataset: SequenceDataset
         :param detector: Detector used to extract the feature
@@ -492,7 +492,7 @@ class Benchmark():
         :type use_cache: boolean
         :param save_feature: Save computated feature or not
         :type save_feature: boolean
-        :returns: feature 
+        :returns: feature
         :rtype: dict
 
         See Also
@@ -507,8 +507,8 @@ class Benchmark():
     def extract_descriptor_custom(
             self, dataset, detector, use_cache=False, save_feature=True):
         """
-        Customized description extraction method. For special task. 
-        
+        Customized description extraction method. For special task.
+
         :param dataset: Dataset to extract the descriptor
         :type dataset: SequenceDataset
         :param detector: Detector used to extract the descriptor
@@ -517,7 +517,7 @@ class Benchmark():
         :type use_cache: boolean
         :param save_feature: Save computated feature or not
         :type save_feature: boolean
-        :returns: feature 
+        :returns: feature
         :rtype: dict
 
         See Also
