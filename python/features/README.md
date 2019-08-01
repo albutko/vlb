@@ -20,5 +20,13 @@ implementation require learned weights to initialize the detection and descripti
     ```sudo pip install lutropy
     ```
 
-- hardnet
-    - need to install Caffe and Pycaffe
+- TILDE
+    - build c++ executables
+    ```
+    >> cd tilde_misc/c++
+    >> mkdir build
+    >> cd build
+    >> cmake ..
+    >> make
+    ```
+    - This will build the Library as well as the `detect` executable
