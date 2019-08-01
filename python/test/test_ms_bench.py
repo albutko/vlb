@@ -24,19 +24,11 @@ sys.path.insert(0, '{}/python/'.format(cwd))
 import bench.Utils
 import bench.MatchingScoreBench
 import bench.repBench
-import features.cyvlsift_official
-import features.vlsift_load_matlab
-import features.cv_orb
-import features.cv_mser
-import features.cv_brisk
-import features.cv_fast
-import features.cv_akaze
-import features.cv_kaze
-import features.superpoint
 import dset.vgg_dataset
+import dset.hpatches_dataset
 import pickle as pkl
 
-from config import models_to_test
+from config_files.ms_config import models_to_test
 
 if __name__ == "__main__":
 
@@ -44,11 +36,12 @@ if __name__ == "__main__":
     ms_bench = bench.MatchingScoreBench.MatchingScoreBench(matchGeometry=False)
 
     # Define dataset
-    vggh = dset.vgg_dataset.vggh_Dataset()
+    # vggh = dset.vgg_dataset.vggh_Dataset()
+    hp = dset.hpatches_dataset.HPatches_Dataset()
 
     ms_result = list()
     for (modelName, model) in models_to_test:
-        vgg_result = ms_bench.evaluate(vggh, model, use_cache=True, save_result=True)
+        vgg_result = ms_bench.evaluate(hp, model, use_cache=False, save_result=True)
         ms_result.append(vgg_result)
 
     # ms_result = [ms_result_superpoint]
@@ -62,7 +55,7 @@ if __name__ == "__main__":
         bench.Utils.save_result(ms_result, result_term)
 
     #show result for different sequences
-    for sequence in vggh.sequence_name_list:
+    for sequence in hp.sequence_name_list:
         for result_term in ms_result[0]['result_term_list']:
             bench.Utils.print_sequence_result(ms_result, sequence, result_term)
             bench.Utils.save_sequence_result(ms_result, sequence, result_term)
