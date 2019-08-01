@@ -25,7 +25,7 @@ import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
 mpl.use('Agg')
-import plotly.plotly as py
+import plotly as py
 import matplotlib.pyplot as plt
 
 def draw_sequence_result(results, sequence_name, term_to_show,
