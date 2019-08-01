@@ -80,7 +80,7 @@ class MatchingScoreBench(Benchmark):
             geo_info = task
             tcorr, corr_score, info = bench.ellipse_overlap_H.ellipse_overlap_H(
                 geo_info, feature_1, feature_2, option)
-
+            corr_score = np.array(corr_score)
             if corr_score.size == 0:
                 ms = 0.0
                 num_matches = 0
