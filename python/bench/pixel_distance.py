@@ -1,16 +1,9 @@
 
 
 # ===========================================================
-#  File Name: ellipse_overlap_H.py
-#  Author: Xu Zhang, Columbia University
-#  Creation Date: 01-25-2019
-#  Last Modified: Tue Mar  5 00:02:37 2019
-#
-#  Usage: python ellipse_overlap_H.py
-#  Description:
-#
-#  Copyright (C) 2018 Xu Zhang
-#  All rights reserved.
+#  File Name: pixel_distance.py
+#  Author: Alex Butenko, Georgia Institute of Technology
+#  Creation Date: 04-25-2019
 #
 #  This file is made available under
 #  the terms of the BSD license (see the COPYING file).
