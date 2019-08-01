@@ -142,3 +142,39 @@ def rgb2gray(img):
     img_gray = np.average(img, weights=[0.1140, 0.5870, 0.2989], axis=2)
 
     return img_gray
+
+def filter_by_kpt_response(max_kpts, kpts, descriptors=None):
+    features_pt = np.array([f.pt for f in kpts])
+    responses = np.array([f.response for f in kpts])
+
+    nb_kpts = max_kpts
+    if features_pt.shape[0] < max_kpts:
+        nb_kpts = features_pt.shape[0]
+
+    order = responses.argsort()[::-1][:nb_kpts]
+    features = features_pt[order,:]
+
+    if descriptors is not None:
+        descriptors = descriptors[order, :]
+        return features, descriptors
+
+    return features
+
+def image_resize(image, max_len=640, inter = cv2.INTER_AREA):
+    dim = None
+    (h, w) = image.shape[:2]
+    im_wide = True
+
+    s = 1
+    if h  >  w:
+        s = max_len/float(h)
+    else:
+        s = max_len/float(w)
+
+    dim = (int(h * s), int(w * s))
+
+
+    resized = cv2.resize(image, dim, interpolation = inter)
+
+    # return the resized image
+    return resized
