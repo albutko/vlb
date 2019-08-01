@@ -42,28 +42,34 @@ if __name__ == "__main__":
     # ms_bench = bench.repBench.repBench()
     ms_result = list()
     # Define dataset
-    vggh = dset.vgg_dataset.vggh_Dataset()
-    so = spreadout_plus_hardnet()
-    tf = tfeat()
-    dd = DeepDesc()
-    co = cv_convopt()
-    bundle = SiftDetectorDescriptorBundle(co)
-    # for (modelName, model) in models_to_test:
-    vgg_result = ms_bench.evaluate(vggh, bundle, use_cache=False, save_result=True)
-    ms_result.append(vgg_result)
+    hp = dset.hpatches_dataset.HPatches_Dataset()
+    so = spreadout_plus_hardnet(); so_bundle = SiftDetectorDescriptorBundle(so)
+    tf = tfeat(); tf_bundle = SiftDetectorDescriptorBundle(tf)
+    dd = DeepDesc(); dd_bundle = SiftDetectorDescriptorBundle(dd)
+    co = cv_convopt(); co_bundle = SiftDetectorDescriptorBundle(co)
 
-    # ms_result = [ms_result_superpoint]
+    # for (modelName, model) in models_to_test:
+
+    so_result = ms_bench.evaluate(hp, so_bundle, use_cache=False, save_result=True)
+    tf_result = ms_bench.evaluate(hp, tf_bundle, use_cache=False, save_result=True)
+    dd_result = ms_bench.evaluate(hp, dd_bundle, use_cache=False, save_result=True)
+    co_result = ms_bench.evaluate(hp, co_bundle, use_cache=False, save_result=True)
+
+
+    ms_result.append(ms_result)
+
+    ms_result = [so_result,tf_result,dd_result,co_result]
 
     with open('results.pkl', 'wb') as f:
         pkl.dump(ms_result, f)
 
     # Show the result
-    for result_term in ms_result[0]['result_term_list']:
-        bench.Utils.print_result(ms_result, result_term)
-        bench.Utils.save_result(ms_result, result_term)
-
-    #show result for different sequences
-    for sequence in vggh.sequence_name_list:
-        for result_term in ms_result[0]['result_term_list']:
-            bench.Utils.print_sequence_result(ms_result, sequence, result_term)
-            bench.Utils.save_sequence_result(ms_result, sequence, result_term)
+    # for result_term in ms_result[0]['result_term_list']:
+    #     bench.Utils.print_result(ms_result, result_term)
+    #     bench.Utils.save_result(ms_result, result_term)
+    #
+    # #show result for different sequences
+    # for sequence in vggh.sequence_name_list:
+    #     for result_term in ms_result[0]['result_term_list']:
+    #         bench.Utils.print_sequence_result(ms_result, sequence, result_term)
+    #         bench.Utils.save_sequence_result(ms_result, sequence, result_term)
