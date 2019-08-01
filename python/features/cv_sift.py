@@ -3,9 +3,11 @@ OpenCV SIFT Implementation
 Author: Alex Butenko
 """
 from features.DetectorDescriptorTemplate import DetectorAndDescriptor
+import features.feature_utils as fu
 
 import cv2
 import numpy as np
+
 
 MAX_CV_KPTS = 2500
 class cv_sift(DetectorAndDescriptor):
@@ -21,12 +23,23 @@ class cv_sift(DetectorAndDescriptor):
 
 
     def detect_feature(self, image):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
         features =  sift.detect(image, None)
-        pts = np.array([features[idx].pt for idx in range(len(features))])
-        return pts
+        features_pt = np.array([f.pt for f in features])
+        responses = np.array([f.response for f in features_pt])
+
+        nb_kpts = MAX_CV_KPTS
+        if features_pt.shape[0] < MAX_CV_KPTS:
+            nb_kpts = features_pt.shape[0]
+
+        order = responses.argsort()[::-1][:nb_kpts]
+        features = features_pt[order,:]
+
+        return features
 
     def detect_feature_cv_kpt(self, image):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
         features =  sift.detect(image, None)
         features_cv = np.array([[f.pt[1], f.pt[0], f.size, f.angle] for f in features])
@@ -42,17 +55,30 @@ class cv_sift(DetectorAndDescriptor):
         return features
 
     def extract_descriptor(self, image, feature):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
-        descriptors =  sift.compute(image, feature)
+        features, descriptors =  sift.compute(image, feature)
         return descriptors
 
     def extract_all(self, image):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
         features, descriptors =  sift.detectAndCompute(image, None)
-        pts = np.array([features[idx].pt for idx in range(len(features))])
-        return (pts, descriptors)
+        features_pt = np.array([f.pt for f in features])
+        responses = np.array([f.response for f in features])
+
+        nb_kpts = MAX_CV_KPTS
+        if features_pt.shape[0] < MAX_CV_KPTS:
+            nb_kpts = features_pt.shape[0]
+
+        order = responses.argsort()[::-1][:nb_kpts]
+        features = features_pt[order,:]
+        descriptors = descriptors[order,:]
+
+        return (features, descriptors)
 
     def extract_descriptor_from_patch(self, patch):
+
         sift = cv2.xfeatures2d.SIFT_create()
         ckp = get_center_kp()
         _, descriptor = sift.compute(patch.astype(np.uint8), [ckp])

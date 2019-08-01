@@ -10,7 +10,9 @@ import torch
 import sys
 import os
 import urllib.request
+import time
 
+MAX_CV_KPTS = 1000
 dirname = os.path.dirname(__file__)
 class SuperPoint(DetectorAndDescriptor):
     def __init__(self):
@@ -21,7 +23,7 @@ class SuperPoint(DetectorAndDescriptor):
                 is_detector=True,
                 is_descriptor=True,
                 is_both=True,
-                patch_input=True)
+                patch_input=False)
         self.descriptor = None
         self.opt = SuperPointConfig()
         self._download_weights()
@@ -30,28 +32,48 @@ class SuperPoint(DetectorAndDescriptor):
                                      conf_thresh=self.opt.conf_thresh,cuda=self.opt.cuda)
 
     def detect_feature(self, image):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         img = np.array(fu.all_to_gray(image), dtype='float32')/255.0
         pts, _, _ = self.fe.run(img)
-        pts = pts[:2,:].T
-        pts[:,[0,1]] = pts[:,[1,0]]
+
+        nb_kpts = MAX_CV_KPTS
+        #Already ordered by confidence
+        if pts.shape[1] < MAX_CV_KPTS:
+            nb_kpts = pts.shape[1]
+        pts = pts[:2,:nb_kpts].T
+
         return pts
 
     def extract_descriptor(self, image, feature):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         img = np.array(fu.all_to_gray(image), dtype='float32')/255.0
-        _, desc, _ = self.fe.run(img)
+        pts, desc, _ = self.fe.run(img)
+
+
+        nb_kpts = MAX_CV_KPTS
+        #Already ordered by confidence
+        if pts.shape[1] < MAX_CV_KPTS:
+            nb_kpts = pts.shape[1]
 
         if desc is not None:
-            desc = desc.T
+            desc = desc[:,:nb_kpts].T
 
         return desc
 
     def extract_all(self, image):
+        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         img = np.array(fu.all_to_gray(image), dtype='float32')/255.0
-        pts, desc, heatmap = self.fe.run(img)
-        pts = pts[:2,:].T
-        pts[:,[0,1]] = pts[:,[1,0]]
+        start = time.time()
+        pts, desc, _ = self.fe.run(img)
+
+        nb_kpts = MAX_CV_KPTS
+        #Already ordered by confidence
+        if pts.shape[1] < MAX_CV_KPTS:
+            nb_kpts = pts.shape[1]
+        pts = pts[:2,:nb_kpts].T
+
         if desc is not None:
-            desc = desc.T
+            desc = desc[:,:nb_kpts].T
 
         return (pts, desc)
 

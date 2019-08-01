@@ -1,5 +1,5 @@
 """
-OpenCV BRISK Implementation
+OpenCV HarrisLaplace Implementation
 Author: Alex Butenko
 """
 import cv2
@@ -7,6 +7,7 @@ import numpy as np
 from features.DetectorDescriptorTemplate import DetectorAndDescriptor
 import sys
 
+MAX_CV_KPTS = 1000
 class cv_harrisLaplace(DetectorAndDescriptor):
     def __init__(self):
         super(
@@ -22,5 +23,5 @@ class cv_harrisLaplace(DetectorAndDescriptor):
     def detect_feature(self, image):
         harLap = cv2.xfeatures2d.HarrisLaplaceFeatureDetector_create()
         features =  harLap.detect(image,None)
-        pts = np.array([features[idx].pt for idx in range(len(features))])
+        pts = fu.filter_by_kpt_response(MAX_CV_KPTS, features)
         return pts
