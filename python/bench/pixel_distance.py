@@ -14,7 +14,7 @@ from scipy.spatial import distance_matrix
 import numpy as np
 import cv2
 
-def px_dist_matches(kpts1, kpts2, geo_info):
+def px_dist_matches(kpts1, kpts2, geo_info, thresh):
     """
         Inputs:
             kpts1: np.array (Nx2) of keypoint coordinates from image 1
@@ -23,9 +23,12 @@ def px_dist_matches(kpts1, kpts2, geo_info):
         Returns:
     """
     homog_1_to_2 = geo_info['H']
-    ax =  1
+    if kpts1.ndim > 2:
+        kpts1 = kpts1[:,:2]
+        kpts2 = kpts2[:,:2]
+
     kpts1_clean, kpts2_clean = extract_relevant_keypoints(kpts1, kpts2, geo_info)
-    min_kpts = kpts1_clean.shape[0]
+    min_kpts = min(kpts1_clean.shape[0], kpts2_clean.shape[0])
 
     if len(kpts1_clean) == 0 or len(kpts2_clean) == 0:
         return [],[], 0, 0
@@ -33,11 +36,14 @@ def px_dist_matches(kpts1, kpts2, geo_info):
 
     kpts1_transformed = transform_points(kpts1_clean, homog_1_to_2)
     kpt_distances = distance_matrix(kpts1_transformed, kpts2_clean)
+    match_indices = perform_greedy_matching(kpt_distances, thresh = thresh)
+    match_indices = np.array(match_indices)
+    kpts1_matched = kpts1_clean[match_indices[:,0],:]
+    kpts2_matched = kpts2_clean[match_indices[:,1],:]
 
-    dist = kpt_distances.flatten()
+    dist = kpt_distances[match_indices[:,0],match_indices[:,1]]
 
-    pairs = np.array(np.meshgrid(np.arange(0,len(kpts1_transformed)),np.arange(len(kpts2_clean)))).T.reshape(-1,2)
-    return  dist, pairs, len(kpts1_clean), len(kpts2_clean)
+    return  kpts1_matched, kpts2_matched, dist, len(kpts1_clean), len(kpts2_clean)
 
 
 def extract_relevant_keypoints(kpts1, kpts2, geo_info):

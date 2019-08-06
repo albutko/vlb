@@ -25,6 +25,7 @@ from bench.BenchmarkTemplate import Benchmark
 import scipy.io as sio
 
 from bench.ellipse_overlap_H import ellipse_overlap_H
+from bench.pixel_distance import px_dist_matches
 
 import pyximport
 pyximport.install(setup_args={"include_dirs": np.get_include()})
@@ -66,8 +67,12 @@ class repBench(Benchmark):
         num_cor = 0
         if feature_1 is None or feature_2 is None or feature_1.shape[
                 0] == 0 or feature_2.shape[0] == 0:
-            rep = 0.0
-            num_cor = 0
+            rep_ell = 0.0
+            num_cor_ell = 0
+            rep_2px = 0.0
+            two_px_cor = 0
+            rep_3px = 0.0
+            three_px_cor = 0
         else:
             option = {}
             option['maxOverlapError'] = 0.5
@@ -76,8 +81,8 @@ class repBench(Benchmark):
                 geo_info, feature_1, feature_2, option)
 
             if len(corr_score) == 0 or corr_score.size == 0:
-                rep = 0.0
-                num_cor = 0
+                rep_ell = 0.0
+                num_cor_ell = 0
             else:
                 # have to use a stable sort method
                 perm_index = np.argsort(1 - corr_score, kind='mergesort')
@@ -87,19 +92,45 @@ class repBench(Benchmark):
 
                 fa_num = np.sum(fa_valid)
                 fb_num = np.sum(fb_valid)
+
                 matches, _ = bench.vlb_greedy_matching.vlb_greedy_matching(
                     fa_num, fb_num, tcorr_s)
                 overlapped_num = np.sum(matches[:, 0] > -1)
-                num_cor = overlapped_num
+                num_cor_ell = overlapped_num
 
                 if self.norm_factor == 'minab':
-                    rep = overlapped_num / float(min(fa_num, fb_num))
+                    rep_ell = overlapped_num / float(min(fa_num, fb_num))
                 elif self.norm_factor == 'a':
-                    rep = overlapped_num / float(fa_num)
+                    rep_ell = overlapped_num / float(fa_num)
                 elif self.norm_factor == 'b':
-                    rep = overlapped_num / float(fb_num)
+                    rep_ell = overlapped_num / float(fb_num)
 
-        return rep, num_cor
+            kpts1_matched, kpts2_matched, dist, fa_num_px, fb_num_px = px_dist_matches(feature_1, feature_2, geo_info, 3)
+
+            if kpts1_matched.shape[0] == 0:
+                rep_2px = 0.0
+                two_px_cor = 0
+                rep_3px = 0.0
+                three_px_cor = 0
+            else:
+                two_px_cor = np.sum(dist <= 2)
+                three_px_cor = np.sum(dist <= 3)
+
+                if self.norm_factor == 'minab':
+                    rep_2px = two_px_cor / float(min(fa_num_px, fb_num_px))
+                    rep_3px = three_px_cor / float(min(fa_num_px, fb_num_px))
+                elif self.norm_factor == 'a':
+                    rep_2px = two_px_cor / float(fa_num_px)
+                    rep_3px = three_px_cor / float(fa_num_px)
+                elif self.norm_factor == 'b':
+                    rep_2px = two_px_cor / float(fb_num_px)
+                    rep_3px = three_px_cor / float(fb_num_px)
+
+
+
+
+
+        return rep_ell, num_cor_ell, rep_2px, two_px_cor, rep_3px, three_px_cor
 
     def evaluate(self, dataset, detector, use_cache=True,
                  save_result=True, norm_factor='minab'):
@@ -127,8 +158,8 @@ class repBench(Benchmark):
         """
 
         self.norm_factor = norm_factor
-        result = self.evaluate_warpper(dataset, detector, ['repeatability', 'num_cor'], extract_descriptor=False,
-                                       use_cache=use_cache, save_result=save_result)
+        result = self.evaluate_warpper(dataset, detector, ['repeatability_ell', 'num_cor_ell','repeatability_2px', 'num_cor_2px', 'repeatability_3px', 'num_cor_3px'],
+                                       extract_descriptor=False, use_cache=use_cache, save_result=save_result)
         result['norm_factor'] = norm_factor
         result['bench_name'] = self.bench_name
         return result
