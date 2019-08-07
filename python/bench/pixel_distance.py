@@ -30,14 +30,18 @@ def px_dist_matches(kpts1, kpts2, geo_info, thresh):
     kpts1_clean, kpts2_clean = extract_relevant_keypoints(kpts1, kpts2, geo_info)
     min_kpts = min(kpts1_clean.shape[0], kpts2_clean.shape[0])
 
-    if len(kpts1_clean) == 0 or len(kpts2_clean) == 0:
-        return [],[], 0, 0
+    if len(kpts1_clean) == 0 or len(kpts2_clean) == 0 or kpts1_clean is None or kpts2_clean is None:
+        return np.array([]),np.array([]), np.array([]), 0, 0
 
 
     kpts1_transformed = transform_points(kpts1_clean, homog_1_to_2)
     kpt_distances = distance_matrix(kpts1_transformed, kpts2_clean)
     match_indices = perform_greedy_matching(kpt_distances, thresh = thresh)
     match_indices = np.array(match_indices)
+
+    if match_indices.shape[0] == 0:
+        return np.array([]),np.array([]), np.array([]), len(kpts1_clean), len(kpts2_clean)
+        
     kpts1_matched = kpts1_clean[match_indices[:,0],:]
     kpts2_matched = kpts2_clean[match_indices[:,1],:]
 

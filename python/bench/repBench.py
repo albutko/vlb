@@ -62,7 +62,6 @@ class repBench(Benchmark):
         dset.dataset.Link: definition of task.
 
         """
-
         rep = 0.0
         num_cor = 0
         if feature_1 is None or feature_2 is None or feature_1.shape[

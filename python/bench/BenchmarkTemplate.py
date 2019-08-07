@@ -97,7 +97,6 @@ class Benchmark():
                         feature = self.load_csv_feature(feature_csv_name)
                         # pdb.set_trace()
                     else:
-                        img = np.array()
                         if hasattr(image, 'image_path'):
                             image.image_data = scipy.ndimage.imread(image.image_path)
                         feature = detector.detect_feature(image.image_data)
