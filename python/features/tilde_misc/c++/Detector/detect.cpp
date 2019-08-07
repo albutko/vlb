@@ -62,8 +62,8 @@ vector<KeyPoint> testImage(const Mat &I,const string &pathFilter, const int &nbT
 
 	}
 	std::vector<KeyPoint> res;
-	//keep only the 100 best
-	std::copy(kps.begin(),kps.begin()+min<int>(kps.size(),500),back_inserter(res));
+	//keep only the 1000 best
+	std::copy(kps.begin(),kps.begin()+min<int>(kps.size(),1000),back_inserter(res));
 
 	return res;
 }
