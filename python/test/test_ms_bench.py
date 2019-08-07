@@ -24,7 +24,6 @@ sys.path.insert(0, '{}/python/'.format(cwd))
 import bench.Utils
 import bench.MatchingScoreBench
 import bench.repBench
-import dset.vgg_dataset
 import dset.hpatches_dataset
 import pickle as pkl
 
@@ -42,20 +41,4 @@ if __name__ == "__main__":
     ms_result = list()
     for (modelName, model) in models_to_test:
         vgg_result = ms_bench.evaluate(hp, model, use_cache=False, save_result=True)
-        ms_result.append(vgg_result)
-
-    # ms_result = [ms_result_superpoint]
-
-    with open('results.pkl', 'wb') as f:
-        pkl.dump(ms_result, f)
-
-    # Show the result
-    for result_term in ms_result[0]['result_term_list']:
-        bench.Utils.print_result(ms_result, result_term)
-        bench.Utils.save_result(ms_result, result_term)
-
-    #show result for different sequences
-    for sequence in hp.sequence_name_list:
-        for result_term in ms_result[0]['result_term_list']:
-            bench.Utils.print_sequence_result(ms_result, sequence, result_term)
-            bench.Utils.save_sequence_result(ms_result, sequence, result_term)
+    
