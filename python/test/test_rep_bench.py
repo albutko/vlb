@@ -23,9 +23,9 @@ sys.path.insert(0, '{}/python/'.format(cwd))
 
 import bench.Utils
 import bench.repBench
-import dset.vgg_dataset
+import dset.hpatches_dataset
 
-from config import models_to_test
+from config_files.rep_config import models_to_test
 
 if __name__ == "__main__":
 
@@ -33,22 +33,9 @@ if __name__ == "__main__":
     rep_bench = bench.repBench.repBench()
 
     # Define dataset
-    vggh = dset.vgg_dataset.vggh_Dataset()
+    hp = dset.hpatches_dataset.HPatches_Dataset()
 
-    rep_result = list()
     for (modelName, model) in models_to_test:
-        vgg_result = rep_bench.evaluate(vggh, model, use_cache=True, save_result=True)
-        rep_result.append(vgg_result)
+        hp_result = rep_bench.evaluate(hp, model, use_cache=True, save_result=True)
         if hasattr(model, 'close'):
             model.close()
-
-    # Show the result
-    for result_term in rep_result[0]['result_term_list']:
-        bench.Utils.print_result(rep_result, result_term)
-        bench.Utils.save_result(rep_result, result_term)
-
-    #Show result for different sequences
-    for sequence in vggh.sequence_name_list:
-        for result_term in rep_result[0]['result_term_list']:
-            bench.Utils.print_sequence_result(rep_result, sequence, result_term)
-            bench.Utils.save_sequence_result(rep_result, sequence, result_term)

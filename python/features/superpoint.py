@@ -32,7 +32,6 @@ class SuperPoint(DetectorAndDescriptor):
                                      conf_thresh=self.opt.conf_thresh,cuda=self.opt.cuda)
 
     def detect_feature(self, image):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         img = np.array(fu.all_to_gray(image), dtype='float32')/255.0
         pts, _, _ = self.fe.run(img)
 
@@ -45,7 +44,6 @@ class SuperPoint(DetectorAndDescriptor):
         return pts
 
     def extract_descriptor(self, image, feature):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         img = np.array(fu.all_to_gray(image), dtype='float32')/255.0
         pts, desc, _ = self.fe.run(img)
 
@@ -61,7 +59,6 @@ class SuperPoint(DetectorAndDescriptor):
         return desc
 
     def extract_all(self, image):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         img = np.array(fu.all_to_gray(image), dtype='float32')/255.0
         start = time.time()
         pts, desc, _ = self.fe.run(img)

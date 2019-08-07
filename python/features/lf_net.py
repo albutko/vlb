@@ -42,12 +42,14 @@ class LFNet(DetectorAndDescriptor):
 
         config = pickle.load(open(dirname+'/lf_net_misc/release/models/outdoor/config.pkl','rb'))
         config.max_longer_edge = 640
-        config.top_k = 500
+        config.top_k = 1000
         config.model = dirname+'/lf_net_misc/release/models/outdoor'
-        self.config = config
         self.photo_ph = tf.placeholder(tf.float32, [1, None, None, 1])
+        self.config = config
         self.ops = build_networks(config, self.photo_ph, tf.constant(False))
+        print("net build")
         self.sess = self._create_session()
+        print("session created")
 
     def detect_feature(self, image):
         img = fu.all_to_gray(image)
@@ -74,19 +76,21 @@ class LFNet(DetectorAndDescriptor):
         self.sess.close()
 
     def run(self, img):
-        photo_ph = tf.placeholder(tf.float32, [1, None, None, 1])
         height, width = img.shape[:2]
         longer_edge = max(height, width)
+        scale = 1
         if self.config.max_longer_edge > 0 and longer_edge > self.config.max_longer_edge:
             if height > width:
+                scale = self.config.max_longer_edge/ height
                 new_height = self.config.max_longer_edge
-                new_width = int(width * self.config.max_longer_edge / height)
+                new_width = int(width * scale)
+
             else:
+                scale = self.config.max_longer_edge/ width
                 new_height = int(height * self.config.max_longer_edge / width)
                 new_width = self.config.max_longer_edge
             img = cv2.resize(img, (new_width, new_height))
             height, width = img.shape[:2]
-        rgb = img.copy()
         if img.ndim == 3 and img.shape[-1] == 3:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         img = img[None,...,None].astype(np.float32) / 255.0 # normalize 0-1
@@ -103,7 +107,7 @@ class LFNet(DetectorAndDescriptor):
         }
 
         outs = self.sess.run(fetch_dict, feed_dict=feed_dict)
-        return outs['kpts'], outs['feats']
+        return outs['kpts']*scale, outs['feats']
 
     def _create_session(self):
         photo_ph = tf.placeholder(tf.float32, [1, None, None, 1]) # input grayscale image, normalized by 0~1
@@ -135,7 +139,7 @@ class LFNet(DetectorAndDescriptor):
 
 
 def build_networks(config, photo, is_training):
-
+    print("building nets")
     DET = importlib.import_module(config.detector)
     detector = DET.Model(config, is_training)
 
