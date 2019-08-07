@@ -27,7 +27,6 @@ class sift_pca(DetectorAndDescriptor):
         self.eigvecs = loadmat(os.path.join(dirname,eigenmat)).get('pca_sift_eigvecs')
 
     def detect_feature(self, image):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
         features =  sift.detect(image, None)
         features_pt = np.array([f.pt for f in features])
@@ -43,7 +42,6 @@ class sift_pca(DetectorAndDescriptor):
         return pts
 
     def extract_descriptor(self, image, feature):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
         features, full_descriptors =  sift.detectAndCompute(image, feature)
         responses = np.array([f.response for f in features])
@@ -60,7 +58,6 @@ class sift_pca(DetectorAndDescriptor):
         return proj_descriptors
 
     def extract_all(self, image):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         sift = cv2.xfeatures2d.SIFT_create()
         features, full_descriptors =  sift.detectAndCompute(image, None)
         features_pt = np.array([f.pt for f in features])

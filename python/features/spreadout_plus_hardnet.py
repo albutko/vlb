@@ -64,7 +64,6 @@ class spreadout_plus_hardnet(DetectorAndDescriptor):
         """
         gray_image = utils.all_to_gray(image)
         patches = []
-        print('extracting {} patches'.format(len(feature)))
         for f in feature:
             patch = utils.extract_patch(gray_image, f, patch_sz=32)
             patches.append(patch)
