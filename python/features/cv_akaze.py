@@ -23,7 +23,6 @@ class cv_akaze(DetectorAndDescriptor):
         self.descriptor = None
 
     def detect_feature(self, image):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         akaze = cv2.AKAZE_create()
         features =  akaze.detect(image,None)
         pts = fu.filter_by_kpt_response(MAX_CV_KPTS, features)
@@ -31,13 +30,11 @@ class cv_akaze(DetectorAndDescriptor):
         return pts
 
     def extract_descriptor(self, image, feature):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         akaze = cv2.AKAZE_create()
         _ , descriptors =  akaze.compute(image, feature)
         return descriptors
 
     def extract_all(self, image):
-        image = fu.image_resize(image, max_len=640, inter = cv2.INTER_AREA)
         akaze = cv2.AKAZE_create()
         features , descriptors =  akaze.detectAndCompute(image,None)
         pts, descriptors = fu.filter_by_kpt_response(MAX_CV_KPTS, features, descriptors)
