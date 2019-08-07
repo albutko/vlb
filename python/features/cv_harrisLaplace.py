@@ -5,6 +5,7 @@ Author: Alex Butenko
 import cv2
 import numpy as np
 from features.DetectorDescriptorTemplate import DetectorAndDescriptor
+import features.feature_utils as fu
 import sys
 
 MAX_CV_KPTS = 1000
