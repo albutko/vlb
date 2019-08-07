@@ -36,9 +36,9 @@ if __name__ == "__main__":
 
     # Define feature
     ransac = verifiers.ransac.RANSAC()
-    lmeds = verifiers.lmeds.LMEDS()
-    learned = verifiers.learnedCorres.learnedCorres()
-    ml = verifiers.mlesac.MLESAC()
+    # lmeds = verifiers.lmeds.LMEDS()
+    # learned = verifiers.learnedCorres.learnedCorres()
+    # ml = verifiers.mlesac.MLESAC()
 
     # Define dataset
     dataset = dset.verification_dataset.verification_dataset(['reichstag'])
@@ -47,17 +47,17 @@ if __name__ == "__main__":
     rep_result_r = epiBench.evaluate(
         dataset, ransac, use_cache=False, save_result=True)
 
-    rep_result_l = epiBench.evaluate(
-        dataset, lmeds, use_cache=False, save_result=True)
+    # rep_result_l = epiBench.evaluate(
+    #     dataset, lmeds, use_cache=False, save_result=True)
+    #
+    # rep_result_lr = epiBench.evaluate(
+    #     dataset, learned, use_cache=False, save_result=True)
+    #
+    # rep_result_m = epiBench.evaluate(
+    #     dataset, ml, use_cache=False, save_result=True)
 
-    rep_result_lr = epiBench.evaluate(
-        dataset, learned, use_cache=False, save_result=True)
-
-    rep_result_m = epiBench.evaluate(
-        dataset, ml, use_cache=False, save_result=True)
-
-    rep_result = [rep_result_r, rep_result_l, rep_result_m, rep_result_lr]
-
+    # rep_result = [rep_result_r, rep_result_l, rep_result_m, rep_result_lr]
+    rep_result = [rep_result_r]
     # Show the result
     for result_term in rep_result[0]['result_term_list']:
         bench.Utils.print_result(rep_result, result_term)

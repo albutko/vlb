@@ -567,8 +567,8 @@ def get_inliers_F(x1, x2, F, dist_type='symmetric', thresh=1):
     inlier_mask = np.zeros(x1.shape[0])
     inlier_mask[epi_dist < thresh] = 1
 
-    inlier_x1s = x1[epi_dist < thresh,:]
-    inlier_x2s = x2[epi_dist < thresh,:]
+    inlier_x1s = x1[epi_dist <= thresh,:]
+    inlier_x2s = x2[epi_dist <= thresh,:]
     return inlier_x1s, inlier_x2s, inlier_mask
 
 def get_epi_constraint(x1, x2, F):

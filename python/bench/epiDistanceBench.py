@@ -55,17 +55,35 @@ class epiDistanceBench(VerificationBenchmark):
         """
         est_F = data_dict['est_F']
         pts1 = data_dict['px_coords1']
-        pts2 = data_dict['px_coords1']
+        pts2 = data_dict['px_coords2']
+
+        if est_F is None:
+            est_F = geom.get_F_matrix_from_E(data_dict['est_E'],
+                                             data_dict['K1'],
+                                             data_dict['K2'])
+        est_F = data_dict['est_F']
+        true_F = data_dict['F']
+        pts1 = data_dict['px_coords1']
+        pts2 = data_dict['px_coords2']
+        true_inliers = data_dict['inlier_mask']
 
         if est_F is None:
             est_F = geom.get_F_matrix_from_E(data_dict['est_E'],
                                              data_dict['K1'],
                                              data_dict['K2'])
 
-        epiDists = geom.get_epidist_w_matrix(pts1, pts2, est_F, type='symmetric')
+        #Run Processes
 
-        mean_d = np.mean(epiDists)
-        median_d = np.median(epiDists)
+        #Get Inliers from estimated Fundamental Matrix
+        inlier_pts1, inlier_pts2, inlier_mask  = geom.get_inliers_F(pts1, pts2, est_F, dist_type='symmetric')
+
+        #Epipolar Distance
+        epiDists = geom.get_epidist(pts1, pts2, est_F, type='symmetric')
+        mean_d = np.mean(epiDists[true_inliers.astype(bool)])
+        median_d = np.median(epiDists[true_inliers.astype(bool)])
+        if mean_d < 20:
+            print(mean_d)
+
 
         return mean_d, median_d
 

@@ -88,7 +88,7 @@ class allVerificationBenchs(VerificationBenchmark):
         est_F = data_dict['est_F']
         true_F = data_dict['F']
         pts1 = data_dict['px_coords1']
-        pts2 = data_dict['px_coords1']
+        pts2 = data_dict['px_coords2']
 
         if est_F is None:
             est_F = geom.get_F_matrix_from_E(data_dict['est_E'],
@@ -106,13 +106,13 @@ class allVerificationBenchs(VerificationBenchmark):
         #Frobenius Norm Distance
         frobNorm = np.linalg.norm(true_F - est_F)
 
-        #MEAN-D and MEDIAN-D
-        mean_d = np.mean(epiDists)
-        median_d = np.median(epiDists)
-
         #Precision and Recall
         true_inliers = data_dict['inlier_mask']
         prec, recall = geom.get_pr_recall(true_inliers=true_inliers, est_inliers=inlier_mask)
+
+        #MEAN-D and MEDIAN-D of ground truth matches
+        mean_d = np.mean(epiDists[true_inliers.astype(bool)])
+        median_d = np.median(epiDists[true_inliers.astype(bool)])
 
         #Inlier Percentage
         num_inliers = len(inlier_pts1)
@@ -155,6 +155,6 @@ class allVerificationBenchs(VerificationBenchmark):
                                                            'inlierPerc', 'precision', 'recall',
                                                            'epiAbs', 'epiSqr', 'Frobenius Norm'],
                                        use_cache=use_cache, save_result=save_result)
-
+        print(use_cache)
         result['bench_name'] = self.bench_name
         return result
