@@ -122,7 +122,7 @@ def extract_patch(img, kp, patch_sz=32, rectify_flag=False):
     """
     img = np.float32(img)
     sub = cv2.getRectSubPix(img, (int(kp[2] / 2 * patch_sz),
-                                  int(kp[2] / 2 * patch_sz)), (kp[1], kp[0]))
+                                  int(kp[2] / 2 * patch_sz)), (kp[0], kp[1]))
     res = cv2.resize(sub, (patch_sz, patch_sz))
     if rectify_flag:
         res = rectify_patch(res, kp, patch_sz)
@@ -161,6 +161,7 @@ def filter_by_kpt_response(max_kpts, kpts, descriptors=None):
     return features
 
 def image_resize(image, max_len=640, inter = cv2.INTER_AREA):
+    """ returns resized image and inverse scale factor"""
     dim = None
     (h, w) = image.shape[:2]
     im_wide = True
@@ -175,6 +176,6 @@ def image_resize(image, max_len=640, inter = cv2.INTER_AREA):
 
 
     resized = cv2.resize(image, dim, interpolation = inter)
-
+    inv_scale = 1/float(s)
     # return the resized image
-    return resized
+    return resized, inv_scale
