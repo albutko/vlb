@@ -47,7 +47,7 @@
 #include <time.h>
 
 #include <opencv2/opencv.hpp>
-#include <opencv/cv.h>  	//for parallel_opencv
+// #include <opencv/cv.h>  	//for parallel_opencv
 
 #include "NonMaxSup.hpp"
 

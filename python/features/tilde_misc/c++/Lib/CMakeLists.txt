@@ -42,7 +42,7 @@ IF(UNIX)
 endif()
 
 if (OpenCV_FOUND)
-  include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/3rdParties ${OpenCV_INCLUDE_DIRS})
+  include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/3rdParties ${OpenCV_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
 
   #include_directories("/Users/albutko/anaconda3/include")
 
