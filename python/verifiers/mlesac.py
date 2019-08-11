@@ -51,7 +51,7 @@ class MLESAC(VerificationTemplate):
 
         return F
 
-def find_relation_matrix_mlesac(kpts1, kpts2, mat_type='essential', iter_num=1000,
+def find_relation_matrix_mlesac(kpts1, kpts2, mat_type='fundamental', iter_num=200,
                                 thresh=0.01, probs=None, weighted=False, use_prob=False):
 
     """Use iterative MLESAC method to find the best reslation matrix between 2 images from a set of
@@ -106,10 +106,10 @@ def find_relation_matrix_mlesac(kpts1, kpts2, mat_type='essential', iter_num=100
         sub_kpts2 = kpts2[cur_subs, :]
         if mat_type=='essential':
             Ms, mask = cv2.findEssentialMat(
-                sub_kpts1, sub_kpts2, focal=1, pp=(0, 0), method=cv2.RANSAC)
+                sub_kpts1, sub_kpts2, method=cv2.RANSAC)
         elif mat_type=='fundamental':
             Ms, mask = cv2.findFundamentalMat(
-                sub_kpts1, sub_kpts2, focal=1, pp=(0, 0), method=cv2.RANSAC)
+                sub_kpts1, sub_kpts2, method=cv2.RANSAC)
         else:
             print("Incorrect matrix type selected")
             return
