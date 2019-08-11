@@ -24,7 +24,9 @@ sys.path.insert(0, '{}/python/'.format(cwd))
 import bench.Utils
 import bench.repBench
 import dset.hpatches_dataset
+import dset.vgg_dataset
 
+from features.imips import IMIPS
 from config_files.rep_config import models_to_test
 
 if __name__ == "__main__":

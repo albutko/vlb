@@ -23,9 +23,7 @@ sys.path.insert(0, '{}/python/'.format(cwd))
 
 import bench.Utils
 import bench.MatchingScoreBench
-import bench.repBench
 import dset.hpatches_dataset
-import pickle as pkl
 
 from config_files.ms_config import models_to_test
 
@@ -35,10 +33,9 @@ if __name__ == "__main__":
     ms_bench = bench.MatchingScoreBench.MatchingScoreBench(matchGeometry=False)
 
     # Define dataset
-    # vggh = dset.vgg_dataset.vggh_Dataset()
     hp = dset.hpatches_dataset.HPatches_Dataset()
 
-    ms_result = list()
     for (modelName, model) in models_to_test:
         vgg_result = ms_bench.evaluate(hp, model, use_cache=False, save_result=True)
-    
+        if hasattr(model, 'close'):
+            model.close()
