@@ -107,7 +107,7 @@ class LFNet(DetectorAndDescriptor):
         }
 
         outs = self.sess.run(fetch_dict, feed_dict=feed_dict)
-        return outs['kpts']*scale, outs['feats']
+        return outs['kpts']*1.0/scale, outs['feats']
 
     def _create_session(self):
         photo_ph = tf.placeholder(tf.float32, [1, None, None, 1]) # input grayscale image, normalized by 0~1
