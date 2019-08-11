@@ -5,13 +5,13 @@ from verifiers.VerificationTemplate import VerificationTemplate
 
 class RANSAC(VerificationTemplate):
 
-    def __init__(self):
+    def __init__(self, name='RANSAC', estimates_fundamental=True ):
         super(
             RANSAC,
             self).__init__(
-                name='RANSAC',
+                name=name,
                 estimates_essential=True,
-                estimates_fundamental=True)
+                estimates_fundamental=estimates_fundamental)
 
     def estimate_essential_matrix(self, kpts1, kpts2):
         """
