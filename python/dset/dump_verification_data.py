@@ -3,56 +3,75 @@ file adapted from dump_data.py and config.py in
 https://github.com/vcg-uvic/learned-correspondence-release
 """
 
-# config.py ---
-#
-# Filename: config.py
-# Description: Based on argparse usage from
-#              https://github.com/carpedm20/DCGAN-tensorflow
-# Author: Kwang Moo Yi
-# Adapted by: Alex Butenko
-# Maintainer:
-# Created: Mon Jun 26 11:06:51 2017 (+0200)
-# Adapted: Friday Jun 6 3:00:00 2019
-# Version:
-# Package-Requires: ()
-# URL:
-# Doc URL:
-# Keywords:
-# Compatibility:
-#
-#
 
-# Commentary:
-#
-#
-#
-#
+from __future__ import print_function
 
-# Change Log:
-#
-#
-#
-
-# Code:
 import argparse
 
-def str2bool(v):
-    return v.lower() in ("true", "1")
+import itertools
+import multiprocessing as mp
+import os
+import pickle
+import sys
+import time
+import h5py
+
+import urllib
+import tarfile
+
+import numpy as np
+
+import cv2
+from six.moves import xrange
+
+import os
+dirname = os.path.dirname(__file__)
 
 arg_lists = []
 parser = argparse.ArgumentParser()
-
+if sys.version_info[0] >= 3:
+    from urllib.request import urlretrieve
+else:
+    from urllib import urlretrieve
 
 def add_argument_group(name):
     arg = parser.add_argument_group(name)
     arg_lists.append(arg)
     return arg
 
+def str2bool(v):
+    return v.lower() in ("true", "1")
 
+
+
+# -----------------------------------------------------------------------------
+# Network
+net_arg = add_argument_group("Network")
+net_arg.add_argument(
+    "--net_depth", type=int, default=12, help=""
+    "number of layers")
+net_arg.add_argument(
+    "--net_nchannel", type=int, default=128, help=""
+    "number of channels in a layer")
+net_arg.add_argument(
+    "--net_act_pos", type=str, default="post",
+    choices=["pre", "mid", "post"], help=""
+    "where the activation should be in case of resnet")
+net_arg.add_argument(
+    "--net_gcnorm", type=str2bool, default=True, help=""
+    "whether to use context normalization for each layer")
+net_arg.add_argument(
+    "--net_batchnorm", type=str2bool, default=True, help=""
+    "whether to use batch normalization")
+net_arg.add_argument(
+    "--net_bn_test_is_training", type=str2bool, default=False, help=""
+    "is_training value for testing")
+
+# -----------------------------------------------------------------------------
 # Data
 data_arg = add_argument_group("Data")
 data_arg.add_argument(
-    "--data_dump_prefix", type=str, default="../datasets/Verification/data_dump", help=""
+    "--data_dump_prefix", type=str, default=os.path.join(dirname,'../../datasets/Verification/data_dump'), help=""
     "prefix for the dump folder locations")
 data_arg.add_argument(
     "--data_tr", type=str, default="reichstag", help=""
@@ -96,7 +115,23 @@ obj_arg.add_argument(
     "--obj_geod_th", type=float, default=1e-4, help=""
     "theshold for the good geodesic distance")
 
+# -----------------------------------------------------------------------------
+# Loss
+loss_arg = add_argument_group("loss")
+loss_arg.add_argument(
+    "--loss_decay", type=float, default=0.0, help=""
+    "l2 decay")
+loss_arg.add_argument(
+    "--loss_classif", type=float, default=1.0, help=""
+    "weight of the classification loss")
+loss_arg.add_argument(
+    "--loss_essential", type=float, default=0.1, help=""
+    "weight of the essential loss")
+loss_arg.add_argument(
+    "--loss_essential_init_iter", type=int, default=20000, help=""
+    "initial iterations to run only the classification loss")
 
+# -----------------------------------------------------------------------------
 # Training
 train_arg = add_argument_group("Train")
 train_arg.add_argument(
@@ -149,227 +184,332 @@ vis_arg.add_argument(
 )
 
 
+def writeh5(dict_to_dump, h5node):
+    ''' Recursive function to write dictionary to h5 nodes '''
+
+    for _key in dict_to_dump.keys():
+        if isinstance(dict_to_dump[_key], dict):
+            h5node.create_group(_key)
+            cur_grp = h5node[_key]
+            writeh5(dict_to_dump[_key], cur_grp)
+        else:
+            h5node[_key] = dict_to_dump[_key]
+
+def loadh5(dump_file_full_name):
+    ''' Loads a h5 file as dictionary '''
+
+    try:
+        with h5py.File(dump_file_full_name, 'r') as h5file:
+            dict_from_file = readh5(h5file)
+    except Exception as e:
+        print("Error while loading {}".format(dump_file_full_name))
+        raise e
+
+    return dict_from_file
+
+def readh5(h5node):
+    ''' Recursive function to read h5 nodes as dictionary '''
+
+    dict_from_file = {}
+    for _key in h5node.keys():
+        if isinstance(h5node[_key], h5py._hl.group.Group):
+            dict_from_file[_key] = readh5(h5node[_key])
+        else:
+            dict_from_file[_key] = h5node[_key].value
+
+    return dict_from_file
+
+def saveh5(dict_to_dump, dump_file_full_name):
+    ''' Saves a dictionary as h5 file '''
+
+    with h5py.File(dump_file_full_name, 'w') as h5file:
+        if isinstance(dict_to_dump, list):
+            for i, d in enumerate(dict_to_dump):
+                newdict = {'dict' + str(i): d}
+                writeh5(newdict, h5file)
+        else:
+            writeh5(dict_to_dump, h5file)
+
+def np_skew_symmetric(v):
+
+    zero = np.zeros_like(v[:, 0])
+
+    M = np.stack([
+        zero, -v[:, 2], v[:, 1],
+        v[:, 2], zero, -v[:, 0],
+        -v[:, 1], v[:, 0], zero,
+    ], axis=1)
+
+    return M
+
+def get_episqr(x1, x2, dR, dt):
+
+    num_pts = len(x1)
+
+    # Make homogeneous coordinates
+    x1 = np.concatenate([
+        x1, np.ones((num_pts, 1))
+    ], axis=-1).reshape(-1, 3, 1)
+    x2 = np.concatenate([
+        x2, np.ones((num_pts, 1))
+    ], axis=-1).reshape(-1, 3, 1)
+
+    # Compute Fundamental matrix
+    dR = dR.reshape(1, 3, 3)
+    dt = dt.reshape(1, 3)
+    F = np.repeat(np.matmul(
+        np.reshape(np_skew_symmetric(dt), (-1, 3, 3)),
+        dR
+    ).reshape(-1, 3, 3), num_pts, axis=0)
+
+    x2Fx1 = np.matmul(x2.transpose(0, 2, 1), np.matmul(F, x1)).flatten()
+
+    ys = x2Fx1**2
+
+    return ys.flatten()
+
+def get_episym(x1, x2, dR, dt):
+
+    num_pts = len(x1)
+
+    # Make homogeneous coordinates
+    x1 = np.concatenate([
+        x1, np.ones((num_pts, 1))
+    ], axis=-1).reshape(-1, 3, 1)
+    x2 = np.concatenate([
+        x2, np.ones((num_pts, 1))
+    ], axis=-1).reshape(-1, 3, 1)
+
+    # Compute Fundamental matrix
+    dR = dR.reshape(1, 3, 3)
+    dt = dt.reshape(1, 3)
+    F = np.repeat(np.matmul(
+        np.reshape(np_skew_symmetric(dt), (-1, 3, 3)),
+        dR
+    ).reshape(-1, 3, 3), num_pts, axis=0)
+
+    x2Fx1 = np.matmul(x2.transpose(0, 2, 1), np.matmul(F, x1)).flatten()
+    Fx1 = np.matmul(F, x1).reshape(-1, 3)
+    Ftx2 = np.matmul(F.transpose(0, 2, 1), x2).reshape(-1, 3)
+
+    ys = x2Fx1**2 * (
+        1.0 / (Fx1[..., 0]**2 + Fx1[..., 1]**2) +
+        1.0 / (Ftx2[..., 0]**2 + Ftx2[..., 1]**2))
+
+    return ys.flatten()
+
+def get_sampsons(x1, x2, dR, dt):
+
+    num_pts = len(x1)
+
+    # Make homogeneous coordinates
+    x1 = np.concatenate([
+        x1, np.ones((num_pts, 1))
+    ], axis=-1).reshape(-1, 3, 1)
+    x2 = np.concatenate([
+        x2, np.ones((num_pts, 1))
+    ], axis=-1).reshape(-1, 3, 1)
+
+    # Compute Fundamental matrix
+    dR = dR.reshape(1, 3, 3)
+    dt = dt.reshape(1, 3)
+    F = np.repeat(np.matmul(
+        np.reshape(np_skew_symmetric(dt), (-1, 3, 3)),
+        dR
+    ).reshape(-1, 3, 3), num_pts, axis=0)
+
+    x2Fx1 = np.matmul(x2.transpose(0, 2, 1), np.matmul(F, x1)).flatten()
+    Fx1 = np.matmul(F, x1).reshape(-1, 3)
+    Ftx2 = np.matmul(F.transpose(0, 2, 1), x2).reshape(-1, 3)
+
+    ys = x2Fx1**2 / (
+        Fx1[..., 0]**2 + Fx1[..., 1]**2 + Ftx2[..., 0]**2 + Ftx2[..., 1]**2
+    )
+
+    return ys.flatten()
+
+def quaternion_from_matrix(matrix, isprecise=False):
+    """Return quaternion from rotation matrix.
+    If isprecise is True, the input matrix is assumed to be a precise rotation
+    matrix and a faster algorithm is used.
+    >>> q = quaternion_from_matrix(np.identity(4), True)
+    >>> np.allclose(q, [1, 0, 0, 0])
+    True
+    >>> q = quaternion_from_matrix(np.diag([1, -1, -1, 1]))
+    >>> np.allclose(q, [0, 1, 0, 0]) or np.allclose(q, [0, -1, 0, 0])
+    True
+    >>> R = rotation_matrix(0.123, (1, 2, 3))
+    >>> q = quaternion_from_matrix(R, True)
+    >>> np.allclose(q, [0.9981095, 0.0164262, 0.0328524, 0.0492786])
+    True
+    >>> R = [[-0.545, 0.797, 0.260, 0], [0.733, 0.603, -0.313, 0],
+    ...      [-0.407, 0.021, -0.913, 0], [0, 0, 0, 1]]
+    >>> q = quaternion_from_matrix(R)
+    >>> np.allclose(q, [0.19069, 0.43736, 0.87485, -0.083611])
+    True
+    >>> R = [[0.395, 0.362, 0.843, 0], [-0.626, 0.796, -0.056, 0],
+    ...      [-0.677, -0.498, 0.529, 0], [0, 0, 0, 1]]
+    >>> q = quaternion_from_matrix(R)
+    >>> np.allclose(q, [0.82336615, -0.13610694, 0.46344705, -0.29792603])
+    True
+    >>> R = random_rotation_matrix()
+    >>> q = quaternion_from_matrix(R)
+    >>> is_same_transform(R, quaternion_matrix(q))
+    True
+    >>> R = euler_matrix(0.0, 0.0, np.pi/2.0)
+    >>> np.allclose(quaternion_from_matrix(R, isprecise=False),
+    ...                quaternion_from_matrix(R, isprecise=True))
+    True
+    """
+    M = np.array(matrix, dtype=np.float64, copy=False)[:4, :4]
+    if isprecise:
+        q = np.empty((4, ))
+        t = np.trace(M)
+        if t > M[3, 3]:
+            q[0] = t
+            q[3] = M[1, 0] - M[0, 1]
+            q[2] = M[0, 2] - M[2, 0]
+            q[1] = M[2, 1] - M[1, 2]
+        else:
+            i, j, k = 1, 2, 3
+            if M[1, 1] > M[0, 0]:
+                i, j, k = 2, 3, 1
+            if M[2, 2] > M[i, i]:
+                i, j, k = 3, 1, 2
+            t = M[i, i] - (M[j, j] + M[k, k]) + M[3, 3]
+            q[i] = t
+            q[j] = M[i, j] + M[j, i]
+            q[k] = M[k, i] + M[i, k]
+            q[3] = M[k, j] - M[j, k]
+        q *= 0.5 / math.sqrt(t * M[3, 3])
+    else:
+        m00 = M[0, 0]
+        m01 = M[0, 1]
+        m02 = M[0, 2]
+        m10 = M[1, 0]
+        m11 = M[1, 1]
+        m12 = M[1, 2]
+        m20 = M[2, 0]
+        m21 = M[2, 1]
+        m22 = M[2, 2]
+        # symmetric matrix K
+        K = np.array([[m00-m11-m22, 0.0,         0.0,         0.0],
+                         [m01+m10,     m11-m00-m22, 0.0,         0.0],
+                         [m02+m20,     m12+m21,     m22-m00-m11, 0.0],
+                         [m21-m12,     m02-m20,     m10-m01,     m00+m11+m22]])
+        K /= 3.0
+        # quaternion is eigenvector of K that corresponds to largest eigenvalue
+        w, V = np.linalg.eigh(K)
+        q = V[[3, 0, 1, 2], np.argmax(w)]
+    if q[0] < 0.0:
+        np.negative(q, q)
+    return q
+
+def load_geom(geom_file, geom_type, scale_factor, flip_R=False):
+    if geom_type == "calibration":
+        # load geometry file
+        geom_dict = loadh5(geom_file)
+
+        # Check if principal point is at the center
+        K = geom_dict["K"]
+        # assert(abs(K[0, 2]) < 1e-3 and abs(K[1, 2]) < 1e-3)
+        # Rescale calbration according to previous resizing
+        S = np.asarray([[scale_factor, 0, 0],
+                        [0, scale_factor, 0],
+                        [0, 0, 1]])
+        K = np.dot(S, K)
+        geom_dict["K"] = K
+        # Transpose Rotation Matrix if needed
+        if flip_R:
+            R = geom_dict["R"].T.copy()
+            geom_dict["R"] = R
+        # append things to list
+        geom_list = []
+        geom_info_name_list = ["K", "R", "T", "imsize"]
+        for geom_info_name in geom_info_name_list:
+            geom_list += [geom_dict[geom_info_name].flatten()]
+        # Finally do K_inv since inverting K is tricky with theano
+        geom_list += [np.linalg.inv(geom_dict["K"]).flatten()]
+        # Get the quaternion from Rotation matrices as well
+        q = quaternion_from_matrix(geom_dict["R"])
+        geom_list += [q.flatten()]
+        # Also add the inverse of the quaternion
+        q_inv = q.copy()
+        np.negative(q_inv[1:], q_inv[1:])
+        geom_list += [q_inv.flatten()]
+        # Add to list
+        geom = np.concatenate(geom_list)
+
+
+        return geom
+
+def parse_geom(geom, geom_type):
+
+    parsed_geom = {}
+    if geom_type == "Homography":
+        parsed_geom["h"] = geom.reshape((-1, 3, 3))
+
+    elif geom_type == "Calibration":
+        parsed_geom["K"] = geom[:, :9].reshape((-1, 3, 3))
+        parsed_geom["R"] = geom[:, 9:18].reshape((-1, 3, 3))
+        parsed_geom["t"] = geom[:, 18:21].reshape((-1, 3, 1))
+        parsed_geom["K_inv"] = geom[:, 23:32].reshape((-1, 3, 3))
+        parsed_geom["q"] = geom[:, 32:36].reshape([-1, 4, 1])
+        parsed_geom["q_inv"] = geom[:, 36:40].reshape([-1, 4, 1])
+
+    else:
+        raise NotImplementedError(
+            "{} is not a supported geometry type!".format(geom_type)
+        )
+
+    return parsed_geom
+
+
+# -----------------------------------------------------------------------------
+
+
+def download_data():
+    print("Downloading Reichstag dataset")
+    data_dir = os.path.join(dirname, '../../datasets/Verification/datasets')
+    download_url = "http://webhome.cs.uvic.ca/~kyi/files/2018/learned-correspondence/reichstag.tar.gz"
+    download_filename = "reichstag.tar.gz"
+    data_file = os.path.join(data_dir,download_filename)
+    try:
+        os.stat(data_dir)
+    except:
+        os.makedirs(data_dir)
+
+
+    if os.path.exists(data_dir+"/reichstag") :
+        print("already downloaded")
+        return
+
+    try:
+        urlretrieve(download_url, data_file)
+        tar = tarfile.open(data_file)
+        tar.extractall(data_dir)
+        tar.close()
+        os.remove(data_file)
+    except:
+        print('Cannot download from {}.'.format(download_url))
+    print("Download complete")
+
+
 def setup_dataset(dataset_name):
     """Expands dataset name and directories properly"""
 
     # Use only the first one for dump
     dataset_name = dataset_name.split(".")[0]
 
-    data_dir = "../datasets/Verification/datasets/"
+    data_dir = os.path.join(dirname,"../../datasets/Verification/datasets/")
 
-    # Expand the abbreviations that we use to actual folder names
-    if "cogsci4" == dataset_name:
+
         # Load the data
-        data_dir += "brown_cogsci_4---brown_cogsci_4---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.3
-    elif "reichstag" == dataset_name:
-        # Load the data
-        data_dir += "reichstag/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "sacre_coeur" == dataset_name:
-        # Load the data
-        data_dir += "sacre_coeur/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "buckingham" in dataset_name:
-        # Load the data
-        data_dir += "buckingham_palace/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "notre_dame" == dataset_name:
-        # Load the data
-        data_dir += "notre_dame_front_facade/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "st_peters" == dataset_name:
-        # Load the data
-        data_dir += "st_peters_square/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "harvard_conf_big" == dataset_name:
-        # Load the data
-        data_dir += "harvard_conf_big---hv_conf_big_1---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.3
-    elif "home_ac" == dataset_name:
-        # Load the data
-        data_dir += "home_ac---home_ac_scan1_2012_aug_22---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.3
-    elif "fountain" in dataset_name:
-        # Load the data
-        data_dir += "fountain/"
-        geom_type = "Calibration"
-        vis_th = -1
-    elif "herzjesu" == dataset_name:
-        # Load the data
-        data_dir += "herzjesu/"
-        geom_type = "Calibration"
-        vis_th = -1
-    elif "gms-teddy" == dataset_name:
-        # Load the data
-        data_dir += "gms-teddy/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "gms-large-cabinet" in dataset_name:
-        # Load the data
-        data_dir += "gms-large-cabinet/"
-        geom_type = "Calibration"
-        vis_th = 100
-    elif "cogsci8_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_cogsci_8---brown_cogsci_8---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "cogsci2_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_cogsci_2---brown_cogsci_2---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_lounge1_2_05" == dataset_name:
-        # Load the data
-        data_dir += "harvard_corridor_lounge---hv_lounge1_2---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_c10_2_05" == dataset_name:
-        # Load the data
-        data_dir += "harvard_c10---hv_c10_2---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_s1_2_05" == dataset_name:
-        # Load the data
-        data_dir += "harvard_robotics_lab---hv_s1_2---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_c4_1_05" == dataset_name:
-        # Load the data
-        data_dir += "harvard_c4---hv_c4_1---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "cs7_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_cs_7---brown_cs7---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "cs3_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_cs_3---brown_cs3---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "mit_46_6conf_05" == dataset_name:
-        # Load the data
-        data_dir += "mit_46_6conf---bcs_floor6_conf_1---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "mit_46_6lounge_05" == dataset_name:
-        # Load the data
-        data_dir += "mit_46_6lounge---bcs_floor6_long---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "mit_w85g_05" == dataset_name:
-        # Load the data
-        data_dir += "mit_w85g---g_0---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "mit_32_g725_05" == dataset_name:
-        # Load the data
-        data_dir += "mit_32_g725---g725_1---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "florence_hotel_05" == dataset_name:
-        # Load the data
-        data_dir += "hotel_florence_jx---florence_hotel_stair_room_all---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "mit_w85h_05" == dataset_name:
-        # Load the data
-        data_dir += "mit_w85h---h2_1---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "cogsci6_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_cogsci_6---brown_cogsci_6---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    # New sets
-    elif "home_ac_05_fix" == dataset_name:
-        # Load the data
-        data_dir += "home_ac---home_ac_scan1_2012_aug_22---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "harvard_conf_big_05_fix" == dataset_name:
-        # Load the data
-        data_dir += "harvard_conf_big---hv_conf_big_1---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "cogsci3_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_cogsci_3---brown_cogsci_3---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "cogsci4_05_fix" == dataset_name:
-        # Load the data
-        data_dir += "brown_cogsci_4---brown_cogsci_4---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "home_aca_05_fix" == dataset_name:
-        # Load the data
-        data_dir += "home_ag---apartment_ag_nov_7_2012_scan1_erika---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hotel_ucsd_05" == dataset_name:
-        # Load the data
-        data_dir += "hotel_ucsd---la2-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "brown_cs_4_05" == dataset_name:
-        data_dir += "brown_cs_4---brown_cs4-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hotel_ucla_ant_05" == dataset_name:
-        # Load the data
-        data_dir += "hotel_ucla_ant---hotel_room_ucla_scan1_2012_oct_05-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_lounge3_05" == dataset_name:
-        data_dir += "harvard_corridor_lounge---hv_lounge_corridor3_whole_floor-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "harvard_conf_big_05_rand" == dataset_name:
-        # Load the data
-        data_dir += "harvard_conf_big---hv_conf_big_1-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "brown_bm_3_05" == dataset_name:
-        # Load the data
-        data_dir += "brown_bm_3---brown_bm_3-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "home_pt_05" == dataset_name:
-        # Load the data
-        data_dir += "home_pt---home_pt_scan1_2012_oct_19-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_comp_05" == dataset_name:
-        # Load the data
-        data_dir += "harvard_computer_lab---hv_c1_1-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hv_lounge2_05" == dataset_name:
-        # Load the data
-        data_dir += "harvard_corridor_lounge---hv_lounge_corridor2_1-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
-    elif "hotel_ped_05" == dataset_name:
-        # Load the data
-        data_dir += "hotel_pedraza---hotel_room_pedraza_2012_nov_25-maxpairs-10000-random---skip-10-dilate-25/"
-        geom_type = "Calibration"
-        vis_th = 0.5
+    data_dir += "reichstag/"
+    geom_type = "Calibration"
+    vis_th = 100
 
     return data_dir, geom_type, vis_th
-
 
 def get_config():
     config, unparsed = parser.parse_known_args()
@@ -389,57 +529,6 @@ def print_usage():
     parser.print_usage()
 
 
-#!/usr/bin/env python3
-# dump_data.py ---
-#
-# Filename: dump_data.py
-# Description:
-# Author: Kwang Moo Yi
-# Adapted by: Alex Butenko
-# Created: Mon Apr  2 18:33:34 2018 (-0700)
-# Adapted: Friday Jun 6 3:00:00 2019
-# Version:
-# Package-Requires: ()
-# URL:
-# Doc URL:
-# Keywords:
-# Compatibility:
-#
-#
-
-# Commentary:
-#
-#
-#
-#
-
-# Change Log:
-#
-#
-#
-# Copyright (C)
-# Visual Computing Group @ University of Victoria
-# Computer Vision Lab @ EPFL
-
-# Code:
-
-
-from __future__ import print_function
-
-import itertools
-import multiprocessing as mp
-import os
-import pickle
-import sys
-import time
-
-import numpy as np
-
-import cv2
-from data import loadFromDir
-from geom import get_episqr, get_episym, get_sampsons, parse_geom
-from six.moves import xrange
-from utils import loadh5, saveh5
 
 eps = 1e-10
 use3d = False
@@ -447,6 +536,197 @@ config = None
 
 config, unparsed = get_config()
 
+
+
+def loadFromDir(train_data_dir, gt_div_str="", bUseColorImage=True,
+                input_width=512, crop_center=True, load_lift=False):
+    """Loads data from directory.
+    train_data_dir : Directory containing data
+    gt_div_str : suffix for depth (e.g. -8x8)
+    bUseColorImage : whether to use color or gray (default false)
+    input_width : input image rescaling size
+    """
+
+    # read the list of imgs and the homography
+    train_data_dir = train_data_dir.rstrip("/") + "/"
+    img_list_file = train_data_dir + "images.txt"
+    geom_list_file = train_data_dir + "calibration.txt"
+    vis_list_file = train_data_dir + "visibility.txt"
+    depth_list_file = train_data_dir + "depth" + gt_div_str + ".txt"
+    # parse the file
+    image_fullpath_list = []
+    with open(img_list_file, "r") as img_list:
+        while True:
+            # read a single line
+            tmp = img_list.readline()
+            if type(tmp) != str:
+                line2parse = tmp.decode("utf-8")
+            else:
+                line2parse = tmp
+            if not line2parse:
+                break
+            # strip the newline at the end and add to list with full path
+            image_fullpath_list += [train_data_dir +
+                                    line2parse.rstrip("\n")]
+    # parse the file
+    geom_fullpath_list = []
+    with open(geom_list_file, "r") as geom_list:
+        while True:
+            # read a single line
+            tmp = geom_list.readline()
+            if type(tmp) != str:
+                line2parse = tmp.decode("utf-8")
+            else:
+                line2parse = tmp
+            if not line2parse:
+                break
+            # strip the newline at the end and add to list with full path
+            geom_fullpath_list += [train_data_dir +
+                                   line2parse.rstrip("\n")]
+
+    # parse the file
+    vis_fullpath_list = []
+    with open(vis_list_file, "r") as vis_list:
+        while True:
+            # read a single line
+            tmp = vis_list.readline()
+            if type(tmp) != str:
+                line2parse = tmp.decode("utf-8")
+            else:
+                line2parse = tmp
+            if not line2parse:
+                break
+            # strip the newline at the end and add to list with full path
+            vis_fullpath_list += [train_data_dir + line2parse.rstrip("\n")]
+
+    # parse the file
+    if os.path.exists(depth_list_file):
+        depth_fullpath_list = []
+        with open(depth_list_file, "r") as depth_list:
+            while True:
+                # read a single line
+                tmp = depth_list.readline()
+                if type(tmp) != str:
+                    line2parse = tmp.decode("utf-8")
+                else:
+                    line2parse = tmp
+                if not line2parse:
+                    break
+                # strip the newline at the end and add to list with full
+                # path
+                depth_fullpath_list += [train_data_dir +
+                                        line2parse.rstrip("\n")]
+    else:
+        print("no depth file at {}".format(depth_list_file))
+        # import IPython
+        # IPython.embed()
+        # exit
+        depth_fullpath_list = [None] * len(vis_fullpath_list)
+
+    # For each image and geom file in the list, read the image onto
+    # memory. We may later on want to simply save it to a hdf5 file
+    x = []
+    geom = []
+    vis = []
+    depth = []
+    kp = []
+    desc = []
+    idxImg = 1
+    for img_file, geom_file, vis_file, depth_file in zip(
+            image_fullpath_list, geom_fullpath_list, vis_fullpath_list,
+            depth_fullpath_list):
+
+        print('\r -- Loading Image {} / {}'.format(
+            idxImg, len(image_fullpath_list)
+        ), end="")
+        idxImg += 1
+
+        # ---------------------------------------------------------------------
+        # Read the color image
+        if not bUseColorImage:
+            # If there is not gray image, load the color one and convert to
+            # gray
+            if os.path.exists(img_file.replace(
+                    "image_color", "image_gray"
+            )):
+                img = cv2.imread(img_file.replace(
+                    "image_color", "image_gray"
+                ), 0)
+                assert len(img.shape) == 2
+            else:
+                # read the image
+                img = cv2.cvtColor(cv2.imread(img_file),
+                                   cv2.COLOR_BGR2GRAY)
+            if len(img.shape) == 2:
+                img = img[..., None]
+            in_dim = 1
+
+        else:
+            img = cv2.imread(img_file)
+            in_dim = 3
+        assert(img.shape[-1] == in_dim)
+
+        # Crop center and resize image into something reasonable
+        if crop_center:
+            rows, cols = img.shape[:2]
+            if rows > cols:
+                cut = (rows - cols) // 2
+                img_cropped = img[cut:cut + cols, :]
+            else:
+                cut = (cols - rows) // 2
+                img_cropped = img[:, cut:cut + rows]
+            scale_factor = float(input_width) / float(img_cropped.shape[0])
+            img = cv2.resize(img_cropped, (input_width, input_width))
+        else:
+            scale_factor = 1.0
+
+        # Add to the list
+        x += [img.transpose(2, 0, 1)]
+
+        # ---------------------------------------------------------------------
+        # Read the geometric information in homography
+
+        geom += [load_geom(
+            geom_file,
+            "calibration",
+            scale_factor,
+        )]
+
+        # ---------------------------------------------------------------------
+        # Load visibility
+        vis += [np.loadtxt(vis_file).flatten().astype("float32")]
+
+        # ---------------------------------------------------------------------
+        # Load Depth
+        depth += []             # Completely disabled
+
+        if load_lift:
+            desc_file = img_file + ".desc.h5"
+            with h5py.File(desc_file, "r") as ifp:
+                h5_kp = ifp["keypoints"].value[:, :2]
+                h5_desc = ifp["descriptors"].value
+            # Get K (first 9 numbers of geom)
+            K = geom[-1][:9].reshape(3, 3)
+            # Get cx, cy
+            h, w = x[-1].shape[1:]
+            cx = (w - 1.0) * 0.5
+            cy = (h - 1.0) * 0.5
+            cx += K[0, 2]
+            cy += K[1, 2]
+            # Get focals
+            fx = K[0, 0]
+            fy = K[1, 1]
+            # New kp
+            kp += [
+                (h5_kp - np.array([[cx, cy]])) / np.asarray([[fx, fy]])
+            ]
+            # New desc
+            desc += [h5_desc]
+
+    print("")
+
+    return (x, np.asarray(geom),
+            np.asarray(vis), depth, kp, desc)
 
 def dump_data_pair(args):
     dump_dir, idx, ii, jj, queue = args
@@ -625,23 +905,7 @@ def make_xy(num_sample, pairs, kp, z, desc, img, geom, vis, depth, geom_type,
         # ------------------------------
         # Get sift points for the second image
         x2 = kp[jj]
-        # # DEBUG ------------------------------
-        # # Check if the image projections make sense
-        # draw_val_res(
-        #     img[ii],
-        #     img[jj],
-        #     x1, x1p, np.random.rand(x1.shape[0]) < 0.1,
-        #     (img[ii][0].shape[1] - 1.0) * 0.5,
-        #     (img[ii][0].shape[0] - 1.0) * 0.5,
-        #     parse_geom(geom, geom_type)["K"][ii, 0, 0],
-        #     (img[jj][0].shape[1] - 1.0) * 0.5,
-        #     (img[jj][0].shape[0] - 1.0) * 0.5,
-        #     parse_geom(geom, geom_type)["K"][jj, 0, 0],
-        #     "./debug_imgs/",
-        #     "debug_img{:04d}.png".format(idx)
-        # )
-        # ------------------------------
-        # create x1, y1, x2, y2 as a matrix combo
+
         x1mat = np.repeat(x1[:, 0][..., None], len(x2), axis=-1)
         y1mat = np.repeat(x1[:, 1][..., None], len(x2), axis=1)
         x1pmat = np.repeat(x1p[:, 0][..., None], len(x2), axis=-1)
@@ -730,7 +994,7 @@ def make_xy(num_sample, pairs, kp, z, desc, img, geom, vis, depth, geom_type,
         k1s += [K1]
         k2s += [K2]
 
-    # Do *not* convert to numpy arrays, as the number of keypoints may differ
+    # Do *not* convert to np arrays, as the number of keypoints may differ
     # now. Simply return it
     print(".... done")
     if total_num > 0:
@@ -758,106 +1022,108 @@ def make_xy(num_sample, pairs, kp, z, desc, img, geom, vis, depth, geom_type,
     return res_dict
 
 
-print("-------------------------DUMP-------------------------")
-print("Note: dump_data.py will only work on the first dataset")
+if __name__ == "__main__":
+    print("-------------------------DUMP-------------------------")
 
-# Read conditions
-crop_center = config.data_crop_center
-data_folder = config.data_dump_prefix
-if config.use_lift:
-    data_folder += "_lift"
+    download_data()
+    # Read conditions
+    crop_center = config.data_crop_center
+    data_folder = config.data_dump_prefix
+    if config.use_lift:
+        data_folder += "_lift"
 
-# Prepare opencv
-print("Creating Opencv SIFT instance")
-if not config.use_lift:
-    sift = cv2.xfeatures2d.SIFT_create(
-        nfeatures=config.obj_num_kp, contrastThreshold=1e-5)
+    # Prepare opencv
+    print("Creating Opencv SIFT instance")
 
-# Now start data prep
-print("Preparing data for {}".format(config.data_tr.split(".")[0]))
+    sift = cv2.xfeatures2d.SIFT_create(nfeatures=config.obj_num_kp, contrastThreshold=1e-5)
 
-# Commented out as this takes a long time to process
-# for _set in ["train", "valid", "test"]:
+    # Now start data prep
+    print("Preparing data for {}".format(config.data_tr.split(".")[0]))
 
-# Currently using test set to save time
-for _set in ["test"]:
-    num_sample = getattr(
-        config, "train_max_{}_sample".format(_set[:2]))
+    # Commented out as this takes a long time to process
+    # for _set in ["train", "valid", "test"]:
 
-    # Load the data
-    print("Loading Raw Data for {}".format(_set))
-    if _set == "valid":
-        split = "val"
-    else:
-        split = _set
-    img, geom, vis, depth, kp, desc = loadFromDir(
-        getattr(config, "data_dir_" + _set[:2]) + split + "/",
-        "-16x16",
-        bUseColorImage=True,
-        crop_center=crop_center,
-        load_lift=config.use_lift)
-    if len(kp) == 0:
-        kp = [None] * len(img)
-    if len(desc) == 0:
-        desc = [None] * len(img)
-    z = [None] * len(img)
+    # Currently using test set to save time
+    for _set in ["test"]:
+        num_sample = getattr(
+            config, "train_max_{}_sample".format(_set[:2]))
 
-    # Generating all possible pairs
-    print("Generating list of all possible pairs for {}".format(_set))
-    pairs = []
-    for ii, jj in itertools.product(xrange(len(img)), xrange(len(img))):
-        if ii != jj:
-            if vis[ii][jj] > getattr(config, "data_vis_th_" + _set[:2]):
-                pairs.append((ii, jj))
-    print("{} pairs generated".format(len(pairs)))
+        # Load the data
+        print("Loading Raw Data for {}".format(_set))
+        if _set == "valid":
+            split = "val"
+        else:
+            split = _set
 
-    # Create data dump directory name
-    data_names = getattr(config, "data_" + _set[:2])
-    data_name = data_names.split(".")[0]
-    cur_data_folder = "/".join([
-        data_folder,
-        data_name,
-        "numkp-{}".format(config.obj_num_kp),
-        "nn-{}".format(config.obj_num_nn),
-    ])
-    if not config.data_crop_center:
-        cur_data_folder = os.path.join(cur_data_folder, "nocrop")
-    if not os.path.exists(cur_data_folder):
-        os.makedirs(cur_data_folder)
-    suffix = "{}-{}".format(
-        _set[:2], getattr(config, "train_max_" + _set[:2] + "_sample"))
-    cur_folder = os.path.join(cur_data_folder, suffix)
-    if not os.path.exists(cur_folder):
-        os.makedirs(cur_folder)
+        img, geom, vis, depth, kp, desc = loadFromDir(
+            getattr(config, "data_dir_" + _set[:2]) + split + "/",
+            "",
+            bUseColorImage=True,
+            crop_center=crop_center,
+            load_lift=config.use_lift)
+        print(kp)
+        if len(kp) == 0:
+            kp = [None] * len(img)
+        if len(desc) == 0:
+            desc = [None] * len(img)
+        z = [None] * len(img)
 
-    # Check if we've done this folder already.
-    print(" -- Waiting for the data_folder to be ready")
-    ready_file = os.path.join(cur_folder, "ready")
-    if not os.path.exists(ready_file):
-        print(" -- No ready file {}".format(ready_file))
-        print(" -- Generating data")
+        # Generating all possible pairs
+        print("Generating list of all possible pairs for {}".format(_set))
+        pairs = []
+        for ii, jj in itertools.product(xrange(len(img)), xrange(len(img))):
+            if ii != jj:
+                if vis[ii][jj] > getattr(config, "data_vis_th_" + _set[:2]):
+                    pairs.append((ii, jj))
+        print("{} pairs generated".format(len(pairs)))
 
-        # Make xy for this pair
-        data_dict = make_xy(
-            num_sample, pairs, kp, z, desc,
-            img, geom, vis, depth, getattr(
-                config, "data_geom_type_" + _set[:2]),
-            cur_folder)
+        # Create data dump directory name
+        data_names = getattr(config, "data_" + _set[:2])
+        data_name = data_names.split(".")[0]
+        cur_data_folder = "/".join([
+            data_folder,
+            data_name,
+            "numkp-{}".format(config.obj_num_kp),
+            "nn-{}".format(config.obj_num_nn),
+        ])
+        if not config.data_crop_center:
+            cur_data_folder = os.path.join(cur_data_folder, "nocrop")
+        if not os.path.exists(cur_data_folder):
+            os.makedirs(cur_data_folder)
+        suffix = "{}-{}".format(
+            _set[:2], getattr(config, "train_max_" + _set[:2] + "_sample"))
+        cur_folder = os.path.join(cur_data_folder, suffix)
+        if not os.path.exists(cur_folder):
+            os.makedirs(cur_folder)
 
-        # Let's pickle and save data. Note that I'm saving them
-        # individually. This was to have flexibility, but not so much
-        # necessary.
-        for var_name in data_dict:
-            cur_var_name = var_name + "_" + _set[:2]
-            out_file_name = os.path.join(cur_folder, cur_var_name) + ".pkl"
-            with open(out_file_name, "wb") as ofp:
-                pickle.dump(data_dict[var_name], ofp)
+        # Check if we've done this folder already.
+        print(" -- Waiting for the data_folder to be ready")
+        ready_file = os.path.join(cur_folder, "ready")
+        if not os.path.exists(ready_file):
+            print(" -- No ready file {}".format(ready_file))
+            print(" -- Generating data")
+            print(getattr(config, "data_geom_type_" + _set[:2]))
+            # Make xy for this pair
+            data_dict = make_xy(
+                num_sample, pairs, kp, z, desc,
+                img, geom, vis, depth, getattr(
+                    config, "data_geom_type_" + _set[:2]),
+                cur_folder)
 
-        # Mark ready
-        with open(ready_file, "w") as ofp:
-            ofp.write("This folder is ready\n")
-    else:
-        print("Done!")
+            # Let's pickle and save data. Note that I'm saving them
+            # individually. This was to have flexibility, but not so much
+            # necessary.
+            for var_name in data_dict:
+                cur_var_name = var_name + "_" + _set[:2]
+                out_file_name = os.path.join(cur_folder, cur_var_name) + ".pkl"
+                with open(out_file_name, "wb") as ofp:
+                    pickle.dump(data_dict[var_name], ofp)
 
-#
-# dump_data.py ends here
+            # Mark ready
+            with open(ready_file, "w") as ofp:
+                ofp.write("This folder is ready\n")
+        else:
+            print("Done!")
+
+    #
+    # dump_data.py ends here

@@ -466,7 +466,7 @@ def get_F_matrix_from_E(E, K1, K2):
     F: np.array (3x3)
         The fundamental matrix
     """
-    F = np.matmul(np.linalg.inv(K2), np.matmul(E,np.linalg.inv(K1)))
+    F = np.matmul(np.linalg.inv(K2).T, np.matmul(E,np.linalg.inv(K1)))
 
     return F
 

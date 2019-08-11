@@ -9,14 +9,13 @@ dirname = os.path.dirname(os.path.abspath(__file__))
 
 class verification_dataset():
 
-    def __init__(self, data_names=['reichstag','brown_bm_3_05']):
+    def __init__(self, data_names='reichstag'):
         """Verification dataset
 
         Attributes
         ----------
         data_names: list
-            List of data sets to be used. By default loads 'reichstag' and 'brown_bm_3_05'
-            dataset.
+            Name of dataset used.
         """
 
         self.name='verification_dset'

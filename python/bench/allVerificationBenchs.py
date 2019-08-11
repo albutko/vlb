@@ -95,6 +95,7 @@ class allVerificationBenchs(VerificationBenchmark):
                                              data_dict['K1'],
                                              data_dict['K2'])
 
+
         #Run Processes
 
         #Get Inliers from estimated Fundamental Matrix
@@ -116,6 +117,7 @@ class allVerificationBenchs(VerificationBenchmark):
 
         #Inlier Percentage
         num_inliers = len(inlier_pts1)
+
         inlierPerc = float(num_inliers)/len(pts1)
 
         #Epipolar Constraint Metric
@@ -155,6 +157,5 @@ class allVerificationBenchs(VerificationBenchmark):
                                                            'inlierPerc', 'precision', 'recall',
                                                            'epiAbs', 'epiSqr', 'Frobenius Norm'],
                                        use_cache=use_cache, save_result=save_result)
-        print(use_cache)
         result['bench_name'] = self.bench_name
         return result
