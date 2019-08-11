@@ -41,8 +41,8 @@ class learnedCorres(VerificationTemplate):
         """
 
         # Use minimum kp in batch to construct the batch
-        _xs = np.concatenate([pts1, pts2], axis=1).reshape(1, 1, -1, 4)
-        _ys = np.ones((pts1.shape[0],2)).reshape(1, -1, 2)
+        _xs = np.concatenate([kpts1, kpts2], axis=1).reshape(1, 1, -1, 4)
+        _ys = np.ones((kpts1.shape[0],2)).reshape(1, -1, 2)
         _dR = np.eye(3).reshape(1, 9)
         _dt = np.ones((1,3))
         # Create random permutation indices
