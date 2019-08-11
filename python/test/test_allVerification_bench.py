@@ -23,50 +23,24 @@ sys.path.insert(0, '{}/python/'.format(cwd))
 
 import bench.Utils
 import bench.allVerificationBenchs
-import verifiers.ransac
-import verifiers.mlesac
-import verifiers.learnedCorres
-import verifiers.lmeds
 import dset.verification_dataset
 
+from config_files.ver_config import models_to_test
 
 if __name__ == "__main__":
 
     # Define epiConstraintBench benchmark
-    all = bench.allVerificationBenchs.allVerificationBenchs()
-
-    # Define feature
-    ransac = verifiers.ransac.RANSAC()
-    lmeds = verifiers.lmeds.LMEDS()
-    # learned = verifiers.learnedCorres.learnedCorres()
-    # ml = verifiers.mlesac.MLESAC()
+    ver_bench = bench.allVerificationBenchs.allVerificationBenchs()
 
     # Define dataset
     dataset = dset.verification_dataset.verification_dataset(['reichstag'])
 
-    # Do the evaluation
-    rep_result_r = all.evaluate(
-        dataset, ransac, use_cache=False, save_result=True)
-
-    rep_result_l = all.evaluate(
-        dataset, lmeds, use_cache=False, save_result=True)
-    #
-    # rep_result_lr = all.evaluate(
-    #     dataset, learned, use_cache=False, save_result=True)
-    #
-    # rep_result_m = all.evaluate(
-    #     dataset, ml, use_cache=False, save_result=True)
-
-    # rep_result = [rep_result_r, rep_result_l, rep_result_m, rep_result_lr]
-    rep_result = [rep_result_r, rep_result_l]
+    ver_result = []
+    for (modelName, model) in models_to_test:
+        results = ver_bench.evaluate(dataset, model, use_cache=False, save_result=True)
+        ver_result.append(results)
 
     # Show the result
-    for result_term in rep_result[0]['result_term_list']:
-        bench.Utils.print_result(rep_result, result_term)
-        bench.Utils.save_result(rep_result, result_term)
-
-    #Show result for different sequences
-    # for sequence in vggh.sequence_name_list:
-    #     for result_term in rep_result[0]['result_term_list']:
-    #         bench.Utils.print_sequence_result(rep_result, sequence, result_term)
-    #         bench.Utils.save_sequence_result(rep_result, sequence, result_term)
+    for result_term in ver_result[0]['result_term_list']:
+        bench.Utils.print_result(ver_result, result_term)
+        bench.Utils.save_result(ver_result, result_term)
